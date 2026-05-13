@@ -113,15 +113,12 @@ def test_all_twelve_templates_registered() -> None:
     assert set(TEMPLATES) == expected
 
 
-def test_default_widths_are_50_percent_wider(kitchen_sink_md: str) -> None:
-    # The post-bump defaults: 70ch -> 105ch, 76ch -> 114ch (via _basic.css),
-    # 980px -> 1470px, 68ch -> 102ch.
-    assert "max-width: 105ch" in convert(kitchen_sink_md, template="minimal-light")
-    assert "max-width: 105ch" in convert(kitchen_sink_md, template="minimal-dark")
-    assert "max-width: 114ch" in convert(kitchen_sink_md, template="basic-light")
-    assert "max-width: 114ch" in convert(kitchen_sink_md, template="basic-dark")
-    assert "max-width: 1470px" in convert(kitchen_sink_md, template="github")
-    assert "max-width: 102ch" in convert(kitchen_sink_md, template="polished")
+@pytest.mark.parametrize("template", list(TEMPLATES))
+def test_default_width_is_uniform(kitchen_sink_md: str, template: str) -> None:
+    # Every template ships the same 1470px reading column so the rendered output
+    # looks consistently wide regardless of which theme is chosen.
+    html = convert(kitchen_sink_md, template=template)
+    assert "max-width: 1470px" in html
 
 
 @pytest.mark.parametrize(
@@ -130,8 +127,6 @@ def test_default_widths_are_50_percent_wider(kitchen_sink_md: str) -> None:
 )
 def test_new_palette_templates_use_basic_shell(kitchen_sink_md: str, template: str) -> None:
     html = convert(kitchen_sink_md, template=template)
-    # The _basic.css shell defines max-width: 114ch and uses the variable scaffolding.
-    assert "max-width: 114ch" in html
     assert "--accent:" in html
     assert "--soft-bg:" in html
 

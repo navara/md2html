@@ -10,7 +10,7 @@
 body { margin: 0; }
 
 main.md2html {
-  max-width: 114ch;
+  max-width: 1470px;
   margin: 2.5rem auto;
   padding: 0 1.5rem;
   color: var(--text);

@@ -107,8 +107,8 @@ another page won't leak styles.
 
 ### Column width
 
-Each template ships a default reading-friendly column width (between `~105ch`
-and `1470px`). Pass `--width` to override:
+All templates default to a `1470px` reading column (matching `github`) for
+visual consistency across themes. Pass `--width` to override:
 
 ```bash
 md2html doc.md --width 80          # 80ch

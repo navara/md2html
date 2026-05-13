@@ -13,7 +13,7 @@ main.md2html {
   --serif: "Charter", "Source Serif Pro", "Iowan Old Style", "Iowan", "Georgia", "Cambria", serif;
   --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 
-  max-width: 102ch;
+  max-width: 1470px;
   margin: 4rem auto;
   padding: 0 2rem;
   color: var(--text);
