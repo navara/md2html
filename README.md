@@ -135,9 +135,25 @@ html = convert(
 
 ## Development
 
+### With [uv](https://docs.astral.sh/uv/) (recommended)
+
 ```bash
-pip install -e . pytest
-pytest
+uv sync                    # creates .venv, installs editable + locked dev deps
+uv run pytest              # run tests
+uv run md2html doc.md      # run the CLI without activating the venv
+uv build                   # build wheel + sdist into dist/
+```
+
+`uv.lock` is committed so every contributor and CI run gets bit-identical
+transitive dependencies.
+
+### With stock pip / venv
+
+```bash
+py -m venv .venv
+.venv\Scripts\python -m pip install -e . pytest build
+.venv\Scripts\pytest
+.venv\Scripts\python -m build
 ```
 
 Tests live in `tests/test_converter.py` and exercise every template against

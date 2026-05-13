@@ -31,7 +31,13 @@ dependencies = [
 md2html = "md2html.cli:main"
 
 [project.urls]
-Homepage = "https://example.com/md2html"
+Homepage = "https://github.com/navara/md2html"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "build>=1.2",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
