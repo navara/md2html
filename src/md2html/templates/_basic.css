@@ -1,0 +1,156 @@
+/* Shared body for "basic-style" templates. Loaded automatically when a
+   palette file starts with /*! @extends _basic.css *\/
+
+   Each palette file is responsible for declaring these CSS variables on
+   main.md2html:
+     --text, --strong, --muted, --accent, --accent-soft, --border,
+     --soft-bg, --row-alt, --code-chip-bg (optional)
+   plus an html { background: ...; } rule for the page background. */
+
+body { margin: 0; }
+
+main.md2html {
+  max-width: 114ch;
+  margin: 2.5rem auto;
+  padding: 0 1.5rem;
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+main.md2html h1, main.md2html h2, main.md2html h3,
+main.md2html h4, main.md2html h5, main.md2html h6 {
+  margin: 2rem 0 0.85rem;
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--strong);
+}
+main.md2html h1 { font-size: 2rem; margin-top: 0; padding-bottom: 0.35rem; border-bottom: 1px solid var(--border); }
+main.md2html h2 { font-size: 1.5rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--border); }
+main.md2html h3 { font-size: 1.25rem; }
+main.md2html h4 { font-size: 1.05rem; }
+main.md2html h5 { font-size: 0.95rem; }
+main.md2html h6 { font-size: 0.9rem; color: var(--muted); }
+
+main.md2html p { margin: 0 0 1rem; }
+
+main.md2html a {
+  color: var(--accent);
+  text-decoration: none;
+}
+main.md2html a:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+main.md2html strong { font-weight: 600; color: var(--strong); }
+main.md2html em { font-style: italic; }
+main.md2html del { color: var(--muted); }
+
+main.md2html hr {
+  height: 1px;
+  background: var(--border);
+  border: 0;
+  margin: 2rem 0;
+}
+
+main.md2html ul, main.md2html ol { padding-left: 1.5rem; margin: 0 0 1rem; }
+main.md2html li { margin: 0.2rem 0; }
+main.md2html li > ul, main.md2html li > ol { margin: 0.2rem 0; }
+main.md2html li.task-list-item { list-style: none; margin-left: -1.5rem; }
+main.md2html li.task-list-item input { margin-right: 0.5rem; accent-color: var(--accent); }
+
+main.md2html blockquote {
+  margin: 1rem 0;
+  padding: 0.25rem 1rem;
+  border-left: 3px solid var(--accent-soft);
+  background: var(--soft-bg);
+  color: var(--muted);
+  border-radius: 0 4px 4px 0;
+}
+main.md2html blockquote > :last-child { margin-bottom: 0; }
+
+main.md2html code, main.md2html pre, main.md2html kbd, main.md2html samp {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+main.md2html :not(pre) > code {
+  background: var(--code-chip-bg, var(--soft-bg));
+  color: var(--strong);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+}
+main.md2html pre {
+  background: var(--soft-bg);
+  padding: 0.9rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  overflow-x: auto;
+  margin: 1rem 0;
+  line-height: 1.5;
+}
+main.md2html .highlight { margin: 1rem 0; }
+main.md2html .highlight pre { margin: 0; }
+
+main.md2html table {
+  border-collapse: collapse;
+  margin: 1rem 0;
+  width: 100%;
+  font-size: 0.95em;
+}
+main.md2html th, main.md2html td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+main.md2html th { background: var(--soft-bg); font-weight: 600; color: var(--strong); }
+main.md2html tr:nth-child(even) td { background: var(--row-alt); }
+
+main.md2html img { max-width: 100%; height: auto; display: block; margin: 1rem auto; border-radius: 4px; }
+
+main.md2html dl { margin: 1rem 0; }
+main.md2html dt { font-weight: 600; margin-top: 0.5rem; color: var(--strong); }
+main.md2html dd { margin: 0 0 0.5rem 1.5rem; color: var(--muted); }
+
+main.md2html sup { font-size: 0.75em; }
+main.md2html .footnotes { font-size: 0.9em; color: var(--muted); border-top: 1px solid var(--border); margin-top: 2.5rem; padding-top: 1rem; }
+main.md2html .footnotes ol { padding-left: 1.25rem; }
+
+main.md2html .header-anchor {
+  color: var(--muted);
+  text-decoration: none;
+  margin-left: 0.35rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+main.md2html h1:hover .header-anchor, main.md2html h2:hover .header-anchor,
+main.md2html h3:hover .header-anchor, main.md2html h4:hover .header-anchor,
+main.md2html h5:hover .header-anchor, main.md2html h6:hover .header-anchor { opacity: 1; }
+
+main.md2html nav.md2html-toc {
+  background: var(--soft-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 2rem;
+  font-size: 0.95em;
+}
+main.md2html nav.md2html-toc > .md2html-toc-title {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--strong);
+}
+main.md2html nav.md2html-toc ul { padding-left: 1.2rem; margin: 0; list-style: disc; }
+main.md2html nav.md2html-toc ul ul { padding-left: 1rem; }
+main.md2html nav.md2html-toc a { color: var(--accent); text-decoration: none; }
+main.md2html nav.md2html-toc a:hover { text-decoration: underline; }
+
+main.md2html kbd {
+  background: var(--soft-bg);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  padding: 0.1em 0.4em;
+  border-radius: 3px;
+  font-size: 0.85em;
+  color: var(--strong);
+}

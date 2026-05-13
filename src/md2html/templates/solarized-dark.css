@@ -1,0 +1,13 @@
+/*! @extends _basic.css */
+html { background: #002b36; }
+main.md2html {
+  --text: #93a1a1;
+  --strong: #eee8d5;
+  --muted: #586e75;
+  --accent: #268bd2;
+  --accent-soft: #2aa198;
+  --border: #073642;
+  --soft-bg: #073642;
+  --row-alt: #0a3a48;
+  --code-chip-bg: rgba(88, 110, 117, 0.35);
+}

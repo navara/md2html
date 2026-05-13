@@ -1,0 +1,28 @@
+/*! @extends _basic.css */
+html { background: #0a0e1a; }
+main.md2html {
+  --text: #d1d5db;
+  --strong: #ffffff;
+  --muted: #6b7280;
+  --accent: #00d4ff;
+  --accent-soft: #ff4dd2;
+  --border: #1f2937;
+  --soft-bg: #131826;
+  --row-alt: #1a1f30;
+  --code-chip-bg: rgba(0, 212, 255, 0.12);
+}
+
+/* Subtle neon glow accents that set midnight apart from a plain dark theme. */
+main.md2html h1, main.md2html h2 {
+  text-shadow: 0 0 14px rgba(0, 212, 255, 0.18);
+}
+main.md2html h3 { color: var(--accent); }
+main.md2html .highlight, main.md2html pre {
+  box-shadow: 0 0 28px rgba(0, 212, 255, 0.08), 0 0 1px rgba(255, 77, 210, 0.18);
+}
+main.md2html blockquote {
+  border-left-color: var(--accent);
+  box-shadow: -1px 0 12px rgba(0, 212, 255, 0.15);
+}
+main.md2html a:hover { color: var(--accent-soft); text-shadow: 0 0 8px rgba(255, 77, 210, 0.4); }
+main.md2html hr { background: linear-gradient(90deg, transparent, var(--accent), transparent); height: 1px; }
