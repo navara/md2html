@@ -153,3 +153,62 @@ def test_midnight_has_neon_glow() -> None:
     # The midnight palette adds neon glow rules on top of _basic.css.
     assert "text-shadow" in html
     assert "box-shadow" in html
+
+
+# --- regression: image URLs with spaces (and apostrophes) ---
+
+
+def test_image_url_with_spaces_renders_as_img() -> None:
+    """CommonMark forbids spaces in unbracketed image destinations; pdf2mdml
+    and similar tools commonly emit them anyway. We auto-bracket them."""
+    md = "![Image](images/Foo Bar.jpg)"
+    html = convert(md, template="minimal-light")
+    assert "<img " in html
+    # markdown-it percent-encodes the space when rendering, which is fine.
+    assert 'src="images/Foo%20Bar.jpg"' in html
+    # The literal markdown should NOT survive as plain text.
+    assert "![Image](images/Foo Bar.jpg)" not in html
+
+
+def test_image_url_with_apostrophe_and_spaces() -> None:
+    md = "![Image](images/Adventurer's Guide-1-1.jpg)"
+    html = convert(md, template="minimal-light")
+    assert "<img " in html
+    assert "Adventurer's%20Guide-1-1.jpg" in html
+
+
+def test_already_bracketed_image_url_is_untouched() -> None:
+    md = "![Image](<images/Already Bracketed.jpg>)"
+    html = convert(md, template="minimal-light")
+    assert "<img " in html
+    # We must not produce double angle-brackets like (<<...>>).
+    assert "<<" not in html
+
+
+def test_image_url_with_title_left_alone_when_no_space_in_dest() -> None:
+    md = '![alt](file.jpg "the title")'
+    html = convert(md, template="minimal-light")
+    assert "<img " in html
+    assert 'title="the title"' in html
+
+
+def test_inline_images_handles_apostrophes_in_src(tmp_path: Path) -> None:
+    """Regression: the --inline-images regex used to fail when the src
+    attribute contained an apostrophe inside double quotes."""
+    img_dir = tmp_path / "imgs"
+    img_dir.mkdir()
+    img = img_dir / "Adventurer's-1-1.jpg"
+    # A 1x1 valid JPEG is overkill; any bytes prove the read path.
+    img.write_bytes(b"\xff\xd8\xff\xd9")
+    src_md = tmp_path / "doc.md"
+    src_md.write_text(
+        f"![x](imgs/{img.name})\n", encoding="utf-8"
+    )
+    html = convert(
+        src_md.read_text(encoding="utf-8"),
+        template="github",
+        source_path=src_md,
+        inline_images=True,
+    )
+    assert "data:image/jpeg;base64," in html
+    assert "Adventurer's-1-1.jpg" not in html  # original src replaced

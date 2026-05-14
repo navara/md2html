@@ -6,11 +6,14 @@ import base64
 import mimetypes
 import re
 from pathlib import Path
+from urllib.parse import unquote
 
-# Match the src attribute of <img> tags. Captures: (prefix, quote, value)
+# Match the src attribute of <img> tags. Captures: (prefix, quote, value).
+# The value uses ``.*?`` with the captured quote as the terminator so it
+# correctly handles apostrophes inside double-quoted src (and vice versa).
 _IMG_SRC_RE = re.compile(
-    r'(<img\b[^>]*?\bsrc=)(["\'])([^"\']+)\2',
-    re.IGNORECASE,
+    r'(<img\b[^>]*?\bsrc=)(["\'])(.*?)\2',
+    re.IGNORECASE | re.DOTALL,
 )
 
 _SKIP_PREFIXES = ("http://", "https://", "data:", "//")
@@ -28,7 +31,10 @@ def inline_images_in_html(html: str, *, base_dir: Path) -> str:
         src = m.group(3).strip()
         if src.startswith(_SKIP_PREFIXES):
             return m.group(0)
-        path = (base_dir / src).resolve()
+        # markdown-it percent-encodes spaces and other unsafe URL chars in src,
+        # but the file on disk has the literal characters, so decode first.
+        decoded = unquote(src)
+        path = (base_dir / decoded).resolve()
         try:
             data = path.read_bytes()
         except OSError:

@@ -37,6 +37,41 @@ _WIDTH_RE = re.compile(
     r"^\s*\d+(?:\.\d+)?\s*(?:ch|px|em|rem|vw|vh|%|pc|pt|cm|mm|in)?\s*$"
 )
 
+# Match an image whose destination contains a space but is not already wrapped
+# in <angle brackets>. CommonMark only permits spaces in bracketed destinations,
+# so unbracketed ones with spaces (common in markdown generated from PDFs)
+# silently fail to parse as images. We rewrite them to the bracketed form.
+_UNBRACKETED_IMG_WITH_SPACE_RE = re.compile(
+    r"""
+    (!\[(?:[^\]\\\n]|\\.)*\])     # 1: ![alt]
+    \(\s*                          # opening paren + optional space
+    ((?!<)                         # destination must not already start with <
+        [^()\s<>][^()\n<>"]*?      # at least one non-space char, then anything
+        \s                         # require at least one literal space
+        [^()\n<>"]*?               # more dest chars (no quote so we don't slurp titles)
+    )
+    \s*\)                          # closing paren (allow trailing whitespace)
+    """,
+    re.VERBOSE,
+)
+
+
+def _normalize_image_urls(md_text: str) -> str:
+    """Wrap unbracketed image destinations that contain spaces in <...>.
+
+    CommonMark refuses spaces in unbracketed link destinations, which makes
+    ``![alt](path/with spaces.jpg)`` fall back to plain text. Tools that emit
+    markdown from PDFs frequently produce exactly this pattern. Re-emitting
+    the destination as ``<path/with spaces.jpg>`` makes markdown-it parse it
+    as an image. Titles like ``![alt](dest "title")`` and already-bracketed
+    destinations are left alone.
+    """
+
+    def repl(m: re.Match[str]) -> str:
+        return f"{m.group(1)}(<{m.group(2).strip()}>)"
+
+    return _UNBRACKETED_IMG_WITH_SPACE_RE.sub(repl, md_text)
+
 
 def _load_resource(name: str) -> str:
     return resources.files("md2html.templates").joinpath(name).read_text(encoding="utf-8")
@@ -106,6 +141,8 @@ def convert(
         raise ValueError(
             f"Unknown template {template!r}. Choose from: {', '.join(TEMPLATES)}"
         )
+
+    source_md = _normalize_image_urls(source_md)
 
     md = _make_md(with_anchors=with_anchors)
     env: dict = {}
