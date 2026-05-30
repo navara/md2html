@@ -74,7 +74,15 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--watch",
         action="store_true",
-        help="Re-render on file changes (Ctrl-C to stop)",
+        help="Re-render on file changes (Ctrl-C to stop). Implies --overwrite.",
+    )
+    p.add_argument(
+        "--overwrite",
+        action="store_true",
+        help=(
+            "Replace existing .html output files. By default, an existing "
+            "output is left untouched and a 'skipped' line is printed instead."
+        ),
     )
     p.add_argument(
         "--list-templates",
@@ -113,11 +121,15 @@ def main(argv: list[str] | None = None) -> int:
         "width": args.width,
     }
 
+    # Watch mode is opt-in for continuous regeneration, so it implies
+    # --overwrite for both the initial render and every re-render.
+    overwrite = args.overwrite or args.watch
+
     if src.is_file():
         out = args.output if args.output else src.with_suffix(".html")
         if out.is_dir():
             out = out / (src.stem + ".html")
-        _convert_one(src, out, options)
+        _convert_one(src, out, options, overwrite=overwrite)
         if args.watch:
             _watch_file(src, out, options)
     else:
@@ -128,7 +140,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         for f in files:
             target = _target_for(f, src, out_dir)
-            _convert_one(f, target, options)
+            _convert_one(f, target, options, overwrite=overwrite)
         if args.watch:
             _watch_dir(src, out_dir, options, recursive=args.recursive)
     return 0
@@ -144,7 +156,11 @@ def _target_for(source_file: Path, source_root: Path, output_root: Path) -> Path
     return (output_root / rel).with_suffix(".html")
 
 
-def _convert_one(src: Path, out: Path, options: dict) -> None:
+def _convert_one(src: Path, out: Path, options: dict, *, overwrite: bool) -> None:
+    if out.exists() and not overwrite:
+        ts = datetime.now().strftime("%H:%M:%S")
+        print(f"[{ts}] skipped {out} (already exists; pass --overwrite to replace)")
+        return
     markdown_text = src.read_text(encoding="utf-8")
     html = convert(markdown_text, source_path=src, **options)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -166,7 +182,7 @@ def _watch_file(src: Path, out: Path, options: dict) -> None:
             if Path(event.src_path).resolve() != src_resolved:
                 return
             try:
-                _convert_one(src, out, options)
+                _convert_one(src, out, options, overwrite=True)
             except Exception as exc:  # noqa: BLE001
                 print(f"Error: {exc}", file=sys.stderr)
 
@@ -204,7 +220,7 @@ def _watch_dir(src_dir: Path, out_dir: Path, options: dict, recursive: bool) -> 
                 return
             target = _target_for(p, src_dir, out_dir)
             try:
-                _convert_one(p, target, options)
+                _convert_one(p, target, options, overwrite=True)
             except Exception as exc:  # noqa: BLE001
                 print(f"Error: {exc}", file=sys.stderr)
 

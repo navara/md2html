@@ -192,6 +192,69 @@ def test_image_url_with_title_left_alone_when_no_space_in_dest() -> None:
     assert 'title="the title"' in html
 
 
+# --- CLI: skip-existing default and --overwrite ---
+
+
+def test_cli_skips_existing_output_by_default(tmp_path: Path, capsys) -> None:
+    from md2html.cli import main
+
+    src = tmp_path / "doc.md"
+    out = tmp_path / "doc.html"
+    src.write_text("# Hello", encoding="utf-8")
+    assert main([str(src), "-o", str(out)]) == 0
+    first = out.read_text(encoding="utf-8")
+    assert "Hello" in first
+
+    # Modify the source. Re-running without --overwrite should NOT update the
+    # output and should announce the skip.
+    src.write_text("# Hello World", encoding="utf-8")
+    capsys.readouterr()  # drain prior output
+    assert main([str(src), "-o", str(out)]) == 0
+    captured = capsys.readouterr()
+    assert "skipped" in captured.out
+    assert out.read_text(encoding="utf-8") == first
+
+
+def test_cli_overwrite_flag_replaces_existing_output(tmp_path: Path) -> None:
+    from md2html.cli import main
+
+    src = tmp_path / "doc.md"
+    out = tmp_path / "doc.html"
+    src.write_text("# Hello", encoding="utf-8")
+    main([str(src), "-o", str(out)])
+    first = out.read_text(encoding="utf-8")
+
+    src.write_text("# Hello World", encoding="utf-8")
+    assert main([str(src), "-o", str(out), "--overwrite"]) == 0
+    second = out.read_text(encoding="utf-8")
+    assert second != first
+    assert "Hello World" in second
+
+
+def test_cli_directory_mode_mixes_skip_and_render(tmp_path: Path, capsys) -> None:
+    from md2html.cli import main
+
+    src_dir = tmp_path / "docs"
+    src_dir.mkdir()
+    (src_dir / "a.md").write_text("# A", encoding="utf-8")
+    (src_dir / "b.md").write_text("# B", encoding="utf-8")
+    out_dir = tmp_path / "out"
+
+    # First pass: both render.
+    assert main([str(src_dir), "-o", str(out_dir)]) == 0
+    assert (out_dir / "a.html").exists()
+    assert (out_dir / "b.html").exists()
+
+    # Delete one output, leave the other. Second pass should render only the
+    # missing one and skip the surviving one.
+    (out_dir / "a.html").unlink()
+    capsys.readouterr()
+    assert main([str(src_dir), "-o", str(out_dir)]) == 0
+    captured = capsys.readouterr()
+    assert "rendered" in captured.out  # a.html was missing
+    assert "skipped" in captured.out  # b.html existed
+
+
 def test_inline_images_handles_apostrophes_in_src(tmp_path: Path) -> None:
     """Regression: the --inline-images regex used to fail when the src
     attribute contained an apostrophe inside double quotes."""

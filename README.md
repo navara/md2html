@@ -59,6 +59,10 @@ md2html ./docs -r -o ./site -t github
 # Add a table of contents
 md2html doc.md --toc
 
+# Replace an existing output (skip-existing is the default)
+md2html doc.md --overwrite
+md2html ./docs --overwrite          # regenerate the whole folder
+
 # Embed local images as data URIs (truly portable)
 md2html doc.md --inline-images
 
