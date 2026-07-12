@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from . import __version__
-from .converter import DEFAULT_TEMPLATE, TEMPLATES, convert
+from .converter import DEFAULT_TEMPLATE, TEMPLATES, _normalize_width, convert
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -56,7 +56,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--no-anchors",
         action="store_true",
-        help="Disable heading anchor links (on by default)",
+        help=(
+            "Disable heading anchor links (on by default). With --toc, "
+            "headings still get ids so the TOC links keep working."
+        ),
     )
     p.add_argument(
         "--inline-images",
@@ -113,6 +116,12 @@ def main(argv: list[str] | None = None) -> int:
     if not src.exists():
         parser.error(f"path not found: {src}")
 
+    if args.width is not None:
+        try:
+            _normalize_width(args.width)
+        except ValueError as exc:
+            parser.error(str(exc))
+
     options = {
         "template": args.template,
         "with_toc": args.toc,
@@ -129,21 +138,24 @@ def main(argv: list[str] | None = None) -> int:
         out = args.output if args.output else src.with_suffix(".html")
         if out.is_dir():
             out = out / (src.stem + ".html")
-        _convert_one(src, out, options, overwrite=overwrite)
+        ok = _convert_one(src, out, options, overwrite=overwrite)
         if args.watch:
             _watch_file(src, out, options)
+        return 0 if ok else 1
     else:
         out_dir = args.output if args.output else src
         files = _collect_md_files(src, recursive=args.recursive)
         if not files:
             print(f"No .md files found in {src}", file=sys.stderr)
             return 1
+        failed = 0
         for f in files:
             target = _target_for(f, src, out_dir)
-            _convert_one(f, target, options, overwrite=overwrite)
+            if not _convert_one(f, target, options, overwrite=overwrite):
+                failed += 1
         if args.watch:
             _watch_dir(src, out_dir, options, recursive=args.recursive)
-    return 0
+        return 1 if failed else 0
 
 
 def _collect_md_files(directory: Path, recursive: bool) -> list[Path]:
@@ -156,17 +168,23 @@ def _target_for(source_file: Path, source_root: Path, output_root: Path) -> Path
     return (output_root / rel).with_suffix(".html")
 
 
-def _convert_one(src: Path, out: Path, options: dict, *, overwrite: bool) -> None:
-    if out.exists() and not overwrite:
-        ts = datetime.now().strftime("%H:%M:%S")
-        print(f"[{ts}] skipped {out} (already exists; pass --overwrite to replace)")
-        return
-    markdown_text = src.read_text(encoding="utf-8")
-    html = convert(markdown_text, source_path=src, **options)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(html, encoding="utf-8")
+def _convert_one(src: Path, out: Path, options: dict, *, overwrite: bool) -> bool:
+    """Render one file. Returns False (after printing the error) on failure."""
     ts = datetime.now().strftime("%H:%M:%S")
+    if out.exists() and not overwrite:
+        print(f"[{ts}] skipped {out} (already exists; pass --overwrite to replace)")
+        return True
+    try:
+        # utf-8-sig strips a leading BOM, common in files saved on Windows.
+        markdown_text = src.read_text(encoding="utf-8-sig")
+        html = convert(markdown_text, source_path=src, **options)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(html, encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[{ts}] error   {src}: {exc}", file=sys.stderr)
+        return False
     print(f"[{ts}] rendered {src} -> {out}")
+    return True
 
 
 def _watch_file(src: Path, out: Path, options: dict) -> None:
@@ -175,19 +193,25 @@ def _watch_file(src: Path, out: Path, options: dict) -> None:
 
     src_resolved = src.resolve()
 
+    def maybe_render(path_str) -> None:
+        if path_str and Path(path_str).resolve() == src_resolved:
+            _convert_one(src, out, options, overwrite=True)
+
     class Handler(FileSystemEventHandler):
         def on_modified(self, event):  # type: ignore[override]
-            if event.is_directory:
-                return
-            if Path(event.src_path).resolve() != src_resolved:
-                return
-            try:
-                _convert_one(src, out, options, overwrite=True)
-            except Exception as exc:  # noqa: BLE001
-                print(f"Error: {exc}", file=sys.stderr)
+            if not event.is_directory:
+                maybe_render(event.src_path)
+
+        on_created = on_modified
+
+        def on_moved(self, event):  # type: ignore[override]
+            # Editors that save atomically write a temp file and rename it
+            # over the original; that arrives as a move event.
+            if not event.is_directory:
+                maybe_render(getattr(event, "dest_path", None))
 
     observer = Observer()
-    observer.schedule(Handler(), str(src.parent), recursive=False)
+    observer.schedule(Handler(), str(src_resolved.parent), recursive=False)
     observer.start()
     print(f"Watching {src}. Ctrl-C to stop.")
     try:
@@ -204,30 +228,38 @@ def _watch_dir(src_dir: Path, out_dir: Path, options: dict, recursive: bool) -> 
 
     src_dir_resolved = src_dir.resolve()
 
+    def maybe_render(path_str) -> None:
+        if not path_str:
+            return
+        p = Path(path_str)
+        if p.suffix.lower() != ".md":
+            return
+        # Watchdog reports absolute paths, so compare and slice against the
+        # resolved source root (src_dir itself may be relative).
+        p_resolved = p.resolve()
+        try:
+            rel = p_resolved.relative_to(src_dir_resolved)
+        except ValueError:
+            return
+        if not recursive and p_resolved.parent != src_dir_resolved:
+            return
+        target = (out_dir / rel).with_suffix(".html")
+        _convert_one(p_resolved, target, options, overwrite=True)
+
     class Handler(FileSystemEventHandler):
         def on_modified(self, event):  # type: ignore[override]
-            if event.is_directory:
-                return
-            p = Path(event.src_path)
-            if p.suffix.lower() != ".md":
-                return
-            p_resolved = p.resolve()
-            try:
-                p_resolved.relative_to(src_dir_resolved)
-            except ValueError:
-                return
-            if not recursive and p_resolved.parent != src_dir_resolved:
-                return
-            target = _target_for(p, src_dir, out_dir)
-            try:
-                _convert_one(p, target, options, overwrite=True)
-            except Exception as exc:  # noqa: BLE001
-                print(f"Error: {exc}", file=sys.stderr)
+            if not event.is_directory:
+                maybe_render(event.src_path)
 
         on_created = on_modified
 
+        def on_moved(self, event):  # type: ignore[override]
+            # Atomic saves arrive as a rename onto the target file.
+            if not event.is_directory:
+                maybe_render(getattr(event, "dest_path", None))
+
     observer = Observer()
-    observer.schedule(Handler(), str(src_dir), recursive=recursive)
+    observer.schedule(Handler(), str(src_dir_resolved), recursive=recursive)
     observer.start()
     print(f"Watching {src_dir} (recursive={recursive}). Ctrl-C to stop.")
     try:

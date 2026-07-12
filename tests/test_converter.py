@@ -83,6 +83,12 @@ def test_remote_image_not_inlined() -> None:
     assert "https://example.com/img.png" in html
 
 
+def test_uppercase_scheme_image_not_inlined() -> None:
+    md = "![alt](HTTPS://example.com/img.png)"
+    html = convert(md, template="github", source_path=KITCHEN_SINK, inline_images=True)
+    assert "HTTPS://example.com/img.png" in html
+
+
 def test_tables_and_tasklists(kitchen_sink_md: str) -> None:
     html = convert(kitchen_sink_md, template="basic-light")
     assert "<table>" in html
@@ -148,6 +154,34 @@ def test_width_override_rejects_garbage() -> None:
         convert("# x", template="github", width="; body { display:none } /*")
 
 
+def test_width_override_rejects_space_between_number_and_unit() -> None:
+    # "80 px" would be emitted verbatim and is not valid CSS.
+    with pytest.raises(ValueError):
+        convert("# x", template="github", width="80 px")
+
+
+def test_toc_without_anchors_still_has_ids_and_links() -> None:
+    md = "# Title\n\n## Section One\n"
+    html = convert(md, template="github", with_anchors=False, with_toc=True)
+    assert '<nav class="md2html-toc"' in html
+    assert '<a href="#section-one"' in html
+    assert 'id="section-one"' in html
+    # But no visible permalink anchors were requested.
+    assert 'class="header-anchor"' not in html
+
+
+def test_toc_with_skipped_heading_levels_is_valid_html() -> None:
+    md = "# T\n\n## A\n\n#### B\n\n## C\n"
+    html = convert(md, template="github", with_toc=True)
+    toc = html.split('<nav class="md2html-toc">')[1].split("</nav>")[0]
+    # A <ul> must never be a direct child of another <ul>.
+    assert "<ul><ul>" not in toc
+    assert toc.count("<ul>") == toc.count("</ul>")
+    assert toc.count("<li>") == toc.count("</li>")
+    for slug in ("#a", "#b", "#c"):
+        assert f'href="{slug}"' in toc
+
+
 def test_midnight_has_neon_glow() -> None:
     html = convert("# Hello\n\n```py\nprint('hi')\n```", template="midnight")
     # The midnight palette adds neon glow rules on top of _basic.css.
@@ -190,6 +224,21 @@ def test_image_url_with_title_left_alone_when_no_space_in_dest() -> None:
     html = convert(md, template="minimal-light")
     assert "<img " in html
     assert 'title="the title"' in html
+
+
+def test_image_with_space_inside_code_fence_is_untouched() -> None:
+    """The space-in-destination rewrite must not alter fenced code content."""
+    md = "```\n![Image](images/Foo Bar.jpg)\n```\n"
+    html = convert(md, template="minimal-light")
+    assert "![Image](images/Foo Bar.jpg)" in html
+    assert "&lt;images/Foo Bar.jpg&gt;" not in html
+    assert "<img " not in html
+
+
+def test_image_after_code_fence_is_still_normalized() -> None:
+    md = "```\ncode\n```\n\n![Image](images/Foo Bar.jpg)\n"
+    html = convert(md, template="minimal-light")
+    assert 'src="images/Foo%20Bar.jpg"' in html
 
 
 # --- CLI: skip-existing default and --overwrite ---
@@ -253,6 +302,34 @@ def test_cli_directory_mode_mixes_skip_and_render(tmp_path: Path, capsys) -> Non
     captured = capsys.readouterr()
     assert "rendered" in captured.out  # a.html was missing
     assert "skipped" in captured.out  # b.html existed
+
+
+def test_cli_returns_1_and_continues_after_bad_file(tmp_path: Path, capsys) -> None:
+    from md2html.cli import main
+
+    src_dir = tmp_path / "docs"
+    src_dir.mkdir()
+    (src_dir / "bad.md").write_bytes(b"\xff\xfenot utf-8 \xff")
+    (src_dir / "good.md").write_text("# Good", encoding="utf-8")
+    out_dir = tmp_path / "out"
+
+    assert main([str(src_dir), "-o", str(out_dir)]) == 1
+    captured = capsys.readouterr()
+    assert "bad.md" in captured.err
+    # The good file must still be rendered despite the earlier failure.
+    assert (out_dir / "good.html").exists()
+
+
+def test_cli_strips_utf8_bom(tmp_path: Path) -> None:
+    from md2html.cli import main
+
+    src = tmp_path / "doc.md"
+    out = tmp_path / "doc.html"
+    src.write_bytes(b"\xef\xbb\xbf# Title\n")
+    assert main([str(src), "-o", str(out)]) == 0
+    html = out.read_text(encoding="utf-8")
+    assert "<title>Title</title>" in html
+    assert "﻿" not in html
 
 
 def test_inline_images_handles_apostrophes_in_src(tmp_path: Path) -> None:

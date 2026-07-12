@@ -1,7 +1,7 @@
 # md2html
 
 Convert Markdown files to **self-contained HTML** — no external CSS, no external JS,
-optionally no external images. Six built-in themes, Pygments syntax highlighting,
+optionally no external images. Twelve built-in themes, Pygments syntax highlighting,
 and a watch mode for live preview.
 
 ## Features
@@ -16,9 +16,12 @@ and a watch mode for live preview.
   local images as base64 data URIs too
 - **Configurable column width** — sensible defaults per template, override
   with `--width`
-- **Batch mode**: point it at a directory and every `.md` becomes `.html`
+- **Batch mode**: point it at a directory and every `.md` becomes `.html`;
+  a file that fails is reported on stderr, the rest still render, and the
+  exit code is non-zero
 - **Watch mode**: re-render on save for live preview
 - **Auto TOC**: pass `--toc` to prepend a navigable table of contents
+  (headings get ids for the TOC links even with `--no-anchors`)
 
 ## Install
 

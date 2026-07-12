@@ -16,20 +16,24 @@ _IMG_SRC_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
-_SKIP_PREFIXES = ("http://", "https://", "data:", "//")
+# Anything with a URL scheme (http:, https:, data:, file:, mailto:, ...) or a
+# protocol-relative prefix is not a local file. A scheme needs two or more
+# characters before the colon, so Windows drive paths like C:/x.png still
+# count as local.
+_NON_LOCAL_RE = re.compile(r"^(?:[a-zA-Z][a-zA-Z0-9+.\-]+:|//)")
 
 
 def inline_images_in_html(html: str, *, base_dir: Path) -> str:
     """Replace `<img src="local/path.png">` with `<img src="data:...;base64,...">`.
 
-    Remote URLs (`http://`, `https://`, `//`) and existing `data:` URIs are
-    left alone. Missing files are also left alone so the rendered file at
-    least shows a broken image rather than blowing up.
+    URLs with a scheme (`http:`, `https:`, `data:`, ...) and protocol-relative
+    `//` URLs are left alone. Missing files are also left alone so the
+    rendered file at least shows a broken image rather than blowing up.
     """
 
     def replace(m: re.Match[str]) -> str:
         src = m.group(3).strip()
-        if src.startswith(_SKIP_PREFIXES):
+        if _NON_LOCAL_RE.match(src):
             return m.group(0)
         # markdown-it percent-encodes spaces and other unsafe URL chars in src,
         # but the file on disk has the literal characters, so decode first.

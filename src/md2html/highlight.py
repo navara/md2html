@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from html import escape
-from typing import Union
+from typing import Optional, Union
 
 from pygments import highlight as _pygments_highlight
 from pygments.formatters import HtmlFormatter
@@ -27,20 +28,30 @@ _TEMPLATE_PYGMENTS: dict[str, Union[str, tuple[str, str]]] = {
 }
 
 
+_FORMATTER = HtmlFormatter(cssclass="highlight", nowrap=False)
+
+
+@lru_cache(maxsize=128)
+def _get_lexer(lang: str) -> Optional[object]:
+    """Cached lexer lookup; ``get_lexer_by_name`` scans entry points."""
+    try:
+        return get_lexer_by_name(lang, stripall=False)
+    except ClassNotFound:
+        return None
+
+
 def highlight_code(source: str, lang: str | None) -> str:
     """Render a fenced code block as `<div class="highlight"><pre>...</pre></div>`.
 
     Falls back to escaped plain text if the language is unknown or absent.
     """
     if lang:
-        try:
-            lexer = get_lexer_by_name(lang, stripall=False)
-        except ClassNotFound:
+        lexer = _get_lexer(lang)
+        if lexer is None:
             return _plain_fence(source, lang)
     else:
         lexer = TextLexer(stripall=False)
-    formatter = HtmlFormatter(cssclass="highlight", nowrap=False)
-    return _pygments_highlight(source, lexer, formatter)
+    return _pygments_highlight(source, lexer, _FORMATTER)
 
 
 def _plain_fence(source: str, lang: str) -> str:
@@ -48,6 +59,7 @@ def _plain_fence(source: str, lang: str) -> str:
     return f'<div class="highlight"><pre><code{cls}>{escape(source)}</code></pre></div>'
 
 
+@lru_cache(maxsize=None)
 def get_pygments_css(template: str) -> str:
     """Return CSS rules for the given template's chosen Pygments style.
 

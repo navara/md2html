@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from importlib import resources
 from pathlib import Path
 
@@ -34,7 +35,7 @@ DEFAULT_TEMPLATE = "github"
 
 _EXTENDS_RE = re.compile(r"^\s*/\*!\s*@extends\s+([\w.\-]+)\s*\*/", re.MULTILINE)
 _WIDTH_RE = re.compile(
-    r"^\s*\d+(?:\.\d+)?\s*(?:ch|px|em|rem|vw|vh|%|pc|pt|cm|mm|in)?\s*$"
+    r"^\s*\d+(?:\.\d+)?(?:ch|px|em|rem|vw|vh|%|pc|pt|cm|mm|in)?\s*$"
 )
 
 # Match an image whose destination contains a space but is not already wrapped
@@ -56,6 +57,10 @@ _UNBRACKETED_IMG_WITH_SPACE_RE = re.compile(
 )
 
 
+_FENCE_OPEN_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+_FENCE_CLOSE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*$")
+
+
 def _normalize_image_urls(md_text: str) -> str:
     """Wrap unbracketed image destinations that contain spaces in <...>.
 
@@ -64,19 +69,36 @@ def _normalize_image_urls(md_text: str) -> str:
     markdown from PDFs frequently produce exactly this pattern. Re-emitting
     the destination as ``<path/with spaces.jpg>`` makes markdown-it parse it
     as an image. Titles like ``![alt](dest "title")`` and already-bracketed
-    destinations are left alone.
+    destinations are left alone, as is anything inside a fenced code block.
     """
 
     def repl(m: re.Match[str]) -> str:
         return f"{m.group(1)}(<{m.group(2).strip()}>)"
 
-    return _UNBRACKETED_IMG_WITH_SPACE_RE.sub(repl, md_text)
+    out: list[str] = []
+    fence: tuple[str, int] | None = None  # (fence char, opening run length)
+    for line in md_text.splitlines(keepends=True):
+        if fence is not None:
+            out.append(line)
+            m = _FENCE_CLOSE_RE.match(line)
+            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= fence[1]:
+                fence = None
+            continue
+        m = _FENCE_OPEN_RE.match(line)
+        if m:
+            fence = (m.group(1)[0], len(m.group(1)))
+            out.append(line)
+            continue
+        out.append(_UNBRACKETED_IMG_WITH_SPACE_RE.sub(repl, line))
+    return "".join(out)
 
 
+@lru_cache(maxsize=None)
 def _load_resource(name: str) -> str:
     return resources.files("md2html.templates").joinpath(name).read_text(encoding="utf-8")
 
 
+@lru_cache(maxsize=None)
 def _load_template_css(template: str) -> str:
     text = _load_resource(f"{template}.css")
     m = _EXTENDS_RE.search(text[:200])
@@ -96,17 +118,18 @@ def _normalize_width(value: str) -> str:
     return f"{v}ch" if v.replace(".", "", 1).isdigit() else v
 
 
-def _make_md(with_anchors: bool) -> MarkdownIt:
+@lru_cache(maxsize=None)
+def _make_md(with_anchors: bool, with_heading_ids: bool) -> MarkdownIt:
     md = MarkdownIt(
         "gfm-like",
         {"html": True, "linkify": True, "typographer": False, "breaks": False},
     )
-    if with_anchors:
+    if with_anchors or with_heading_ids:
         md.use(
             anchors_plugin,
             min_level=1,
             max_level=6,
-            permalink=True,
+            permalink=with_anchors,
             permalinkSymbol="#",
             permalinkBefore=False,
             permalinkSpace=True,
@@ -136,7 +159,11 @@ def convert(
     width: str | None = None,
     title_override: str | None = None,
 ) -> str:
-    """Convert markdown text into a complete, self-contained HTML document."""
+    """Convert markdown text into a complete, self-contained HTML document.
+
+    ``with_toc=True`` always gives headings ids (needed for the TOC links),
+    even when ``with_anchors=False`` suppresses the visible permalink anchors.
+    """
     if template not in TEMPLATES:
         raise ValueError(
             f"Unknown template {template!r}. Choose from: {', '.join(TEMPLATES)}"
@@ -144,7 +171,8 @@ def convert(
 
     source_md = _normalize_image_urls(source_md)
 
-    md = _make_md(with_anchors=with_anchors)
+    # A TOC needs heading ids even when visible anchor links are disabled.
+    md = _make_md(with_anchors, with_toc)
     env: dict = {}
     tokens = md.parse(source_md, env)
     body_html = md.renderer.render(tokens, md.options, env)
@@ -171,10 +199,10 @@ def convert(
         "<!--MD2HTML:TOC-->": toc_html,
         "<!--MD2HTML:BODY-->": body_html,
     }
-    out = base_html
-    for marker, value in replacements.items():
-        out = out.replace(marker, value)
-    return out
+    # Single pass, so a marker string occurring in the document content is
+    # never itself substituted.
+    marker_re = re.compile("|".join(map(re.escape, replacements)))
+    return marker_re.sub(lambda m: replacements[m.group(0)], base_html)
 
 
 def _html_escape_title(s: str) -> str:
