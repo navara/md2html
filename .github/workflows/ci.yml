@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# Checking out and running tests needs nothing else. Without this the job
+# inherits the repository default, which can be read/write on every scope.
+permissions:
+  contents: read
+
 jobs:
   test:
     # Both platforms on purpose: file discovery and path handling differ
