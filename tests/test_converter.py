@@ -460,6 +460,60 @@ def test_inline_images_skips_unknown_extension(tmp_path: Path) -> None:
 # --- CLI: file discovery, output resolution, atomic writes ---
 
 
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        ("80", "80ch"),  # bare number means characters
+        ("  80  ", "80ch"),  # surrounding space is trimmed
+        ("1.5", "1.5ch"),  # fractional counts too
+        ("90ch", "90ch"),
+        ("1200px", "1200px"),
+        ("60rem", "60rem"),
+        ("50%", "50%"),
+        ("100vw", "100vw"),
+    ],
+)
+def test_normalize_width_accepts_lengths(value: str, expected: str) -> None:
+    from md2html.converter import _normalize_width
+
+    assert _normalize_width(value) == expected
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "wide",
+        "80 px",  # space would be emitted verbatim and is invalid CSS
+        "80px; color: red",  # anything that could close the declaration
+        "-10px",
+        "80furlongs",
+        "80px 90px",
+    ],
+)
+def test_normalize_width_rejects_everything_else(value: str) -> None:
+    from md2html.converter import _normalize_width
+
+    with pytest.raises(ValueError):
+        _normalize_width(value)
+
+
+def test_target_for_mirrors_the_source_tree(tmp_path: Path) -> None:
+    from md2html.cli import _target_for
+
+    root, out = tmp_path / "docs", tmp_path / "site"
+    assert _target_for(root / "a.md", root, out) == out / "a.html"
+    assert _target_for(root / "sub" / "deep" / "b.md", root, out) == (
+        out / "sub" / "deep" / "b.html"
+    )
+
+
+def test_target_for_writes_beside_the_source_when_roots_match(tmp_path: Path) -> None:
+    from md2html.cli import _target_for
+
+    assert _target_for(tmp_path / "a.md", tmp_path, tmp_path) == tmp_path / "a.html"
+
+
 def test_collect_md_files_is_case_insensitive(tmp_path: Path) -> None:
     """Path.glob('*.md') matches .MD on Windows but not on POSIX."""
     from md2html.cli import _collect_md_files
