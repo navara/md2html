@@ -37,6 +37,7 @@ Homepage = "https://github.com/navara/md2html"
 dev = [
     "pytest>=8.0",
     "build>=1.2",
+    "ruff>=0.6",
 ]
 
 [tool.setuptools.packages.find]
@@ -44,3 +45,26 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 md2html = ["templates/*.html", "templates/*.css"]
+
+[tool.ruff]
+line-length = 90
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "W",
+    "F",    # pyflakes
+    "I",    # import order
+    "UP",   # constructs superseded by the 3.10 floor
+    "B",    # bugbear
+    "SIM",  # simplifications
+    "BLE",  # blind except: the CLI has one, deliberately, with a noqa
+    "RUF",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests reach into private helpers on purpose, and import them locally so a
+# broken import fails one test rather than collection.
+"tests/*" = ["PLC0415"]

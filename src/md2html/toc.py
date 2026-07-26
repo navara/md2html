@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from html import escape
-from typing import Iterable
 
 
 def extract_title_from_tokens(tokens) -> str | None:
     """Return the text of the first H1 in the token stream, or None."""
     for i, tok in enumerate(tokens):
-        if tok.type == "heading_open" and tok.tag == "h1":
-            if i + 1 < len(tokens) and tokens[i + 1].type == "inline":
-                return _inline_text(tokens[i + 1].children or [])
+        if tok.type != "heading_open" or tok.tag != "h1":
+            continue
+        if i + 1 < len(tokens) and tokens[i + 1].type == "inline":
+            return _inline_text(tokens[i + 1].children or [])
     return None
 
 
@@ -72,9 +73,7 @@ def _inline_text(children: Iterable) -> str:
     """Flatten inline tokens to readable plain text (drops emphasis, etc)."""
     out: list[str] = []
     for child in children:
-        if child.type == "text":
-            out.append(child.content)
-        elif child.type == "code_inline":
+        if child.type in ("text", "code_inline"):
             out.append(child.content)
         elif child.type in ("softbreak", "hardbreak"):
             out.append(" ")

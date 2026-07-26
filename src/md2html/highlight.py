@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
+from functools import cache, lru_cache
 from html import escape
 
 from pygments import highlight as _pygments_highlight
@@ -61,7 +61,7 @@ def _plain_fence(source: str, lang: str) -> str:
     return f'<div class="highlight"><pre><code{cls}>{escape(source)}</code></pre></div>'
 
 
-@lru_cache(maxsize=None)
+@cache
 def get_pygments_css(template: str) -> str:
     """Return CSS rules for the given template's chosen Pygments style.
 

@@ -4,4 +4,4 @@ __version__ = "0.1.0"
 
 from .converter import DEFAULT_TEMPLATE, TEMPLATES, convert
 
-__all__ = ["__version__", "DEFAULT_TEMPLATE", "TEMPLATES", "convert"]
+__all__ = ["DEFAULT_TEMPLATE", "TEMPLATES", "__version__", "convert"]

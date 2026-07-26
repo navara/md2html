@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from functools import lru_cache
+from functools import cache, lru_cache
 from importlib import resources
 from pathlib import Path
 
@@ -158,12 +158,12 @@ def _normalize_image_urls(md_text: str) -> str:
     return "\n".join(chunks)
 
 
-@lru_cache(maxsize=None)
+@cache
 def _load_resource(name: str) -> str:
     return resources.files("md2html.templates").joinpath(name).read_text(encoding="utf-8")
 
 
-@lru_cache(maxsize=None)
+@cache
 def _load_template_css(template: str) -> str:
     text = _load_resource(f"{template}.css")
     # Look through the header lines rather than a fixed byte count: a
@@ -198,7 +198,7 @@ def _heading_slug(title: str) -> str:
     return _default_slugify(title) or "section"
 
 
-@lru_cache(maxsize=None)
+@cache
 def _make_md(heading_ids: bool, permalinks: bool, allow_raw_html: bool) -> MarkdownIt:
     """Build a parser, cached on the settings that actually shape it.
 

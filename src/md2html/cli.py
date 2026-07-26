@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import sys
 import tempfile
@@ -321,10 +322,9 @@ def _watch(
     def note(path_str) -> None:
         if not path_str:
             return
-        try:
+        # resolve() can fail on a path that vanished between event and handler.
+        with contextlib.suppress(OSError):
             pending.note(Path(path_str).resolve(), time.monotonic())
-        except OSError:
-            pass
 
     class Handler(FileSystemEventHandler):
         def on_modified(self, event):  # type: ignore[override]

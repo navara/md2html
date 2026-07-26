@@ -132,7 +132,9 @@ def test_default_width_is_uniform(kitchen_sink_md: str, template: str) -> None:
     "template",
     ["solarized-light", "solarized-dark", "dracula", "nord", "gruvbox-dark", "midnight"],
 )
-def test_new_palette_templates_use_basic_shell(kitchen_sink_md: str, template: str) -> None:
+def test_new_palette_templates_use_basic_shell(
+    kitchen_sink_md: str, template: str
+) -> None:
     html = convert(kitchen_sink_md, template=template)
     assert "--accent:" in html
     assert "--soft-bg:" in html
@@ -387,13 +389,15 @@ def test_image_with_space_inside_html_block_is_untouched() -> None:
 
 def test_image_with_space_beside_a_code_span_is_still_normalized() -> None:
     """Guard against over-skipping: only the span itself is protected."""
-    html = convert("See `code` then ![Image](images/Foo Bar.jpg)\n", template="minimal-light")
+    md = "See `code` then ![Image](images/Foo Bar.jpg)\n"
+    html = convert(md, template="minimal-light")
     assert 'src="images/Foo%20Bar.jpg"' in html
 
 
 def test_image_with_space_inside_list_item_is_still_normalized() -> None:
     """Four spaces inside a list is list content, not an indented code block."""
-    html = convert("- item\n\n    ![Image](images/Foo Bar.jpg)\n", template="minimal-light")
+    md = "- item\n\n    ![Image](images/Foo Bar.jpg)\n"
+    html = convert(md, template="minimal-light")
     assert 'src="images/Foo%20Bar.jpg"' in html
 
 
