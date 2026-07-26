@@ -1,0 +1,28 @@
+version: 2
+
+updates:
+  # Python dependencies, resolved from uv.lock.
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      # Batch the routine bumps into a single PR. Majors are deliberately
+      # left out so each arrives on its own, with its own CI run: the
+      # actions/checkout v4 -> v7 jump needed release notes read before it
+      # was safe, and that does not belong buried in a group.
+      python-minor:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # Action versions pinned in .github/workflows.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
