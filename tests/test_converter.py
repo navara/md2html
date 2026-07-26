@@ -535,6 +535,48 @@ def test_cli_failed_write_leaves_previous_output_intact(
     assert not [p for p in tmp_path.iterdir() if p.suffix == ".tmp"]
 
 
+# --- raw HTML passthrough and the self-contained guarantee ---
+
+
+def test_raw_html_passes_through_by_default() -> None:
+    html = convert('# T\n\n<div class="note">raw</div>\n', template="github")
+    assert '<div class="note">raw</div>' in html
+
+
+def test_raw_html_can_reference_external_resources() -> None:
+    """Documents the actual default: the self-contained property is ours to
+    keep, not something the input cannot break."""
+    md = '# T\n\n<script src="https://example.com/x.js"></script>\n'
+    assert "<script" in convert(md, template="github")
+
+
+def test_no_raw_html_escapes_it_to_text() -> None:
+    md = '# T\n\n<script src="https://example.com/x.js"></script>\n\n<b>bold</b>\n'
+    html = convert(md, template="github", allow_raw_html=False)
+    assert "<script" not in html
+    assert "&lt;script" in html
+    assert "<b>bold</b>" not in html
+
+
+def test_no_raw_html_leaves_markdown_alone(kitchen_sink_md: str) -> None:
+    html = convert(kitchen_sink_md, template="github", allow_raw_html=False)
+    assert "<table>" in html
+    assert 'class="highlight"' in html
+    assert "<title>Kitchen Sink</title>" in html
+
+
+def test_cli_no_raw_html_flag(tmp_path: Path) -> None:
+    from md2html.cli import main
+
+    src = tmp_path / "doc.md"
+    out = tmp_path / "doc.html"
+    src.write_text(
+        '# T\n\n<script src="https://example.com/x.js"></script>\n', encoding="utf-8"
+    )
+    assert main([str(src), "-o", str(out), "--no-raw-html"]) == 0
+    assert "<script" not in out.read_text(encoding="utf-8")
+
+
 # --- watch mode: event coalescing and target resolution ---
 
 

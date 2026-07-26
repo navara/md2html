@@ -192,10 +192,17 @@ def _heading_slug(title: str) -> str:
 
 
 @lru_cache(maxsize=None)
-def _make_md(with_anchors: bool, with_heading_ids: bool) -> MarkdownIt:
+def _make_md(
+    with_anchors: bool, with_heading_ids: bool, allow_raw_html: bool
+) -> MarkdownIt:
     md = MarkdownIt(
         "gfm-like",
-        {"html": True, "linkify": True, "typographer": False, "breaks": False},
+        {
+            "html": allow_raw_html,
+            "linkify": True,
+            "typographer": False,
+            "breaks": False,
+        },
     )
     if with_anchors or with_heading_ids:
         md.use(
@@ -232,11 +239,18 @@ def convert(
     inline_images: bool = False,
     width: str | None = None,
     title_override: str | None = None,
+    allow_raw_html: bool = True,
 ) -> str:
     """Convert markdown text into a complete, self-contained HTML document.
 
     ``with_toc=True`` always gives headings ids (needed for the TOC links),
     even when ``with_anchors=False`` suppresses the visible permalink anchors.
+
+    Raw HTML in the source is passed through verbatim, as CommonMark
+    specifies. Everything md2html itself emits is self-contained, but a
+    document is free to write ``<script src="https://...">`` and pull in
+    whatever it likes; ``allow_raw_html=False`` escapes raw HTML to text
+    instead, which makes the self-contained property hold for any input.
     """
     if template not in TEMPLATES:
         raise ValueError(
@@ -246,7 +260,7 @@ def convert(
     source_md = _normalize_image_urls(source_md)
 
     # A TOC needs heading ids even when visible anchor links are disabled.
-    md = _make_md(with_anchors, with_toc)
+    md = _make_md(with_anchors, with_toc, allow_raw_html)
     env: dict = {}
     tokens = md.parse(source_md, env)
     body_html = md.renderer.render(tokens, md.options, env)

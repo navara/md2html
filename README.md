@@ -16,6 +16,11 @@ and a watch mode for live preview.
   local images as base64 data URIs too (only files with a recognised image
   extension are embedded, so a stray `<img src="../secrets.env">` cannot
   smuggle itself into the output)
+- **Raw HTML** in the source is passed through verbatim, as CommonMark
+  specifies. Nothing md2html emits reaches the network, but a document that
+  writes its own `<script src="https://...">` still can, so `--no-raw-html`
+  escapes raw HTML to text when the self-contained property has to hold for
+  input you did not write
 - **Configurable column width** — sensible defaults per template, override
   with `--width`
 - **Batch mode**: point it at a directory and every `.md` becomes `.html`;
@@ -72,6 +77,9 @@ md2html ./docs --overwrite          # regenerate the whole folder
 
 # Embed local images as data URIs (truly portable)
 md2html doc.md --inline-images
+
+# Escape raw HTML rather than passing it through
+md2html doc.md --no-raw-html
 
 # Override column width (plain number = ch; unit accepted otherwise)
 md2html doc.md --width 90          # 90ch

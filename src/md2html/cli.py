@@ -79,6 +79,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Embed local images as base64 data URIs in the HTML",
     )
     p.add_argument(
+        "--no-raw-html",
+        action="store_true",
+        help=(
+            "Escape raw HTML in the source instead of passing it through. "
+            "Raw HTML is allowed by default, which lets a document reference "
+            "external scripts or styles; this flag guarantees the output is "
+            "self-contained whatever the input contains."
+        ),
+    )
+    p.add_argument(
         "--width",
         help=(
             "Override the column width. Plain numbers are interpreted as "
@@ -140,6 +150,7 @@ def main(argv: list[str] | None = None) -> int:
         "with_anchors": not args.no_anchors,
         "inline_images": args.inline_images,
         "width": args.width,
+        "allow_raw_html": not args.no_raw_html,
     }
 
     # Watch mode is opt-in for continuous regeneration, so it implies
