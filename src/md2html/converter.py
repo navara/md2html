@@ -9,6 +9,9 @@ from pathlib import Path
 
 from markdown_it import MarkdownIt
 from mdit_py_plugins.anchors import anchors_plugin
+
+# The plugin's own slug function, reused so our ids stay GitHub-compatible.
+from mdit_py_plugins.anchors.index import slugify as _default_slugify
 from mdit_py_plugins.deflist import deflist_plugin
 from mdit_py_plugins.footnote import footnote_plugin
 from mdit_py_plugins.tasklists import tasklists_plugin
@@ -177,6 +180,17 @@ def _normalize_width(value: str) -> str:
     return f"{v}ch" if v.replace(".", "", 1).isdigit() else v
 
 
+def _heading_slug(title: str) -> str:
+    """Slugify a heading, falling back so the id is never empty.
+
+    A heading made only of an image (or of punctuation) slugifies to "",
+    which is not a valid id and leaves the permalink pointing at the top of
+    the page. The plugin uniquifies whatever we hand back, per document, so
+    a constant fallback still yields section, section-1, section-2.
+    """
+    return _default_slugify(title) or "section"
+
+
 @lru_cache(maxsize=None)
 def _make_md(with_anchors: bool, with_heading_ids: bool) -> MarkdownIt:
     md = MarkdownIt(
@@ -188,6 +202,7 @@ def _make_md(with_anchors: bool, with_heading_ids: bool) -> MarkdownIt:
             anchors_plugin,
             min_level=1,
             max_level=6,
+            slug_func=_heading_slug,
             permalink=with_anchors,
             permalinkSymbol="#",
             permalinkBefore=False,

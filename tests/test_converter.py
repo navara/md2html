@@ -183,6 +183,29 @@ def test_toc_with_skipped_heading_levels_is_valid_html() -> None:
         assert f'href="{slug}"' in toc
 
 
+def test_heading_without_sluggable_text_gets_a_usable_id() -> None:
+    """An image-only heading slugifies to "", an invalid id whose permalink
+    just jumps to the top of the page."""
+    html = convert("# T\n\n## ![img](x.png)\n", template="github", with_anchors=True)
+    assert 'id=""' not in html
+    assert 'href="#"' not in html
+    assert 'id="section"' in html
+    assert 'href="#section"' in html
+
+
+def test_fallback_heading_ids_stay_unique() -> None:
+    html = convert("# T\n\n## ![a](x.png)\n\n## !!!\n", template="github")
+    assert 'id="section"' in html
+    assert 'id="section-1"' in html
+
+
+def test_ordinary_heading_ids_are_unchanged_by_the_fallback() -> None:
+    html = convert("# Title\n\n## Same\n\n## Same\n", template="github")
+    for slug in ('id="title"', 'id="same"', 'id="same-1"'):
+        assert slug in html
+    assert "section" not in html
+
+
 def test_midnight_has_neon_glow() -> None:
     html = convert("# Hello\n\n```py\nprint('hi')\n```", template="midnight")
     # The midnight palette adds neon glow rules on top of _basic.css.
