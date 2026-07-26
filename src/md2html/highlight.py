@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from functools import lru_cache
 from html import escape
-from typing import Optional, Union
 
 from pygments import highlight as _pygments_highlight
 from pygments.formatters import HtmlFormatter
@@ -12,7 +11,7 @@ from pygments.lexers import TextLexer, get_lexer_by_name
 from pygments.util import ClassNotFound
 
 # template name → Pygments style (str) or (light, dark) tuple for media-query swap
-_TEMPLATE_PYGMENTS: dict[str, Union[str, tuple[str, str]]] = {
+_TEMPLATE_PYGMENTS: dict[str, str | tuple[str, str]] = {
     "minimal-light": "default",
     "minimal-dark": "monokai",
     "basic-light": "friendly",
@@ -29,10 +28,13 @@ _TEMPLATE_PYGMENTS: dict[str, Union[str, tuple[str, str]]] = {
 
 
 _FORMATTER = HtmlFormatter(cssclass="highlight", nowrap=False)
+# Every unlabelled fence in every document shares this one; highlighting does
+# not carry state between calls.
+_TEXT_LEXER = TextLexer(stripall=False)
 
 
 @lru_cache(maxsize=128)
-def _get_lexer(lang: str) -> Optional[object]:
+def _get_lexer(lang: str) -> object | None:
     """Cached lexer lookup; ``get_lexer_by_name`` scans entry points."""
     try:
         return get_lexer_by_name(lang, stripall=False)
@@ -50,7 +52,7 @@ def highlight_code(source: str, lang: str | None) -> str:
         if lexer is None:
             return _plain_fence(source, lang)
     else:
-        lexer = TextLexer(stripall=False)
+        lexer = _TEXT_LEXER
     return _pygments_highlight(source, lexer, _FORMATTER)
 
 
