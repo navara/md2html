@@ -332,6 +332,60 @@ def test_cli_strips_utf8_bom(tmp_path: Path) -> None:
     assert "﻿" not in html
 
 
+# --- regression: the space-in-destination rewrite must not touch verbatim text ---
+
+
+def _body(html: str) -> str:
+    return html.split('<main class="md2html">')[1].split("</main>")[0]
+
+
+def test_image_with_space_inside_inline_code_is_untouched() -> None:
+    """A code span shows markdown source verbatim; rewriting it corrupts it."""
+    html = convert("Use `![Image](images/Foo Bar.jpg)` here.\n", template="minimal-light")
+    assert "<code>![Image](images/Foo Bar.jpg)</code>" in html
+    assert "<img " not in html
+
+
+def test_image_with_space_inside_indented_code_is_untouched() -> None:
+    html = convert("text\n\n    ![Image](images/Foo Bar.jpg)\n", template="minimal-light")
+    assert "![Image](images/Foo Bar.jpg)" in _body(html)
+    assert "&lt;images/Foo Bar.jpg&gt;" not in html
+    assert "<img " not in html
+
+
+def test_image_with_space_inside_html_block_is_untouched() -> None:
+    html = convert(
+        "<div>\n![Image](images/Foo Bar.jpg)\n</div>\n", template="minimal-light"
+    )
+    assert "![Image](images/Foo Bar.jpg)" in _body(html)
+    assert "<img " not in html
+
+
+def test_image_with_space_beside_a_code_span_is_still_normalized() -> None:
+    """Guard against over-skipping: only the span itself is protected."""
+    html = convert("See `code` then ![Image](images/Foo Bar.jpg)\n", template="minimal-light")
+    assert 'src="images/Foo%20Bar.jpg"' in html
+
+
+def test_image_with_space_inside_list_item_is_still_normalized() -> None:
+    """Four spaces inside a list is list content, not an indented code block."""
+    html = convert("- item\n\n    ![Image](images/Foo Bar.jpg)\n", template="minimal-light")
+    assert 'src="images/Foo%20Bar.jpg"' in html
+
+
+def test_image_with_spaces_and_single_quoted_title() -> None:
+    """The title must survive outside the angle brackets, not land in the src."""
+    html = convert("![alt](images/Foo Bar.jpg 'the title')\n", template="minimal-light")
+    assert 'src="images/Foo%20Bar.jpg"' in html
+    assert 'title="the title"' in html
+
+
+def test_image_with_spaces_and_double_quoted_title() -> None:
+    html = convert('![alt](images/Foo Bar.jpg "the title")\n', template="minimal-light")
+    assert 'src="images/Foo%20Bar.jpg"' in html
+    assert 'title="the title"' in html
+
+
 def test_inline_images_handles_apostrophes_in_src(tmp_path: Path) -> None:
     """Regression: the --inline-images regex used to fail when the src
     attribute contained an apostrophe inside double quotes."""

@@ -38,27 +38,81 @@ _WIDTH_RE = re.compile(
     r"^\s*\d+(?:\.\d+)?(?:ch|px|em|rem|vw|vh|%|pc|pt|cm|mm|in)?\s*$"
 )
 
-# Match an image whose destination contains a space but is not already wrapped
-# in <angle brackets>. CommonMark only permits spaces in bracketed destinations,
-# so unbracketed ones with spaces (common in markdown generated from PDFs)
-# silently fail to parse as images. We rewrite them to the bracketed form.
-_UNBRACKETED_IMG_WITH_SPACE_RE = re.compile(
+# Match any image whose destination is not already wrapped in <angle brackets>.
+# The paren body is captured whole (destination plus a possible title) and split
+# up in ``_rewrite_image``; sorting the two apart in the regex itself cannot be
+# done reliably, because the space before a title looks exactly like a space
+# inside a destination.
+_IMG_DEST_RE = re.compile(
     r"""
     (!\[(?:[^\]\\\n]|\\.)*\])     # 1: ![alt]
     \(\s*                          # opening paren + optional space
-    ((?!<)                         # destination must not already start with <
-        [^()\s<>][^()\n<>"]*?      # at least one non-space char, then anything
-        \s                         # require at least one literal space
-        [^()\n<>"]*?               # more dest chars (no quote so we don't slurp titles)
-    )
+    ((?!<)[^()\n<>]*?)             # 2: destination, plus any title
     \s*\)                          # closing paren (allow trailing whitespace)
     """,
     re.VERBOSE,
 )
 
+# A quoted title at the very end of the paren body, e.g. ``dest "the title"``.
+_TRAILING_TITLE_RE = re.compile(r"""\s+("[^"\n]*"|'[^'\n]*')$""")
 
-_FENCE_OPEN_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
-_FENCE_CLOSE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*$")
+# An inline code span: a run of backticks closed by a run of the same length.
+# Spans may wrap across lines but never across a blank line, since that ends
+# the enclosing block.
+_CODE_SPAN_RE = re.compile(
+    r"(?<!`)(`+)(?!`)(?:(?!\n[ \t]*\n).)+?(?<!`)\1(?!`)", re.DOTALL
+)
+
+
+def _rewrite_image(m: re.Match[str]) -> str:
+    """Bracket an image destination that contains spaces; else leave it as-is.
+
+    Any trailing quoted title is preserved outside the angle brackets, where
+    CommonMark expects it.
+    """
+    body = m.group(2).strip()
+    title = ""
+    tm = _TRAILING_TITLE_RE.search(body)
+    if tm:
+        title = " " + tm.group(1)
+        body = body[: tm.start()].rstrip()
+    # A body that opens with a quote is malformed rather than a spacey path,
+    # and a body without whitespace already parses fine.
+    if not body or body[0] in "\"'" or not any(c.isspace() for c in body):
+        return m.group(0)
+    return f"{m.group(1)}(<{body}>{title})"
+
+
+@lru_cache(maxsize=1)
+def _structure_parser() -> MarkdownIt:
+    """Parser used only to locate verbatim blocks; inline work is wasted here."""
+    return MarkdownIt("gfm-like", {"html": True, "linkify": False})
+
+
+def _verbatim_line_numbers(md_text: str) -> set[int]:
+    """0-based line numbers whose content must be passed through untouched.
+
+    Covers fenced code, indented code and raw HTML blocks. Asking the real
+    block parser avoids the indentation heuristics a line scanner would need
+    (and which get list items wrong: four spaces inside a list is content,
+    not code).
+    """
+    lines: set[int] = set()
+    for tok in _structure_parser().parse(md_text):
+        if tok.type in ("fence", "code_block", "html_block") and tok.map:
+            lines.update(range(tok.map[0], tok.map[1]))
+    return lines
+
+
+def _rewrite_outside_code_spans(text: str) -> str:
+    out: list[str] = []
+    pos = 0
+    for m in _CODE_SPAN_RE.finditer(text):
+        out.append(_IMG_DEST_RE.sub(_rewrite_image, text[pos : m.start()]))
+        out.append(m.group(0))
+        pos = m.end()
+    out.append(_IMG_DEST_RE.sub(_rewrite_image, text[pos:]))
+    return "".join(out)
 
 
 def _normalize_image_urls(md_text: str) -> str:
@@ -68,29 +122,34 @@ def _normalize_image_urls(md_text: str) -> str:
     ``![alt](path/with spaces.jpg)`` fall back to plain text. Tools that emit
     markdown from PDFs frequently produce exactly this pattern. Re-emitting
     the destination as ``<path/with spaces.jpg>`` makes markdown-it parse it
-    as an image. Titles like ``![alt](dest "title")`` and already-bracketed
-    destinations are left alone, as is anything inside a fenced code block.
+    as an image. Already-bracketed destinations are left alone, as is anything
+    the reader is meant to see verbatim: fenced and indented code blocks, raw
+    HTML blocks, and inline code spans.
     """
+    # Nothing to fix in the overwhelming majority of documents, and this check
+    # is far cheaper than the extra parse below.
+    if not any(
+        _rewrite_image(m) != m.group(0) for m in _IMG_DEST_RE.finditer(md_text)
+    ):
+        return md_text
 
-    def repl(m: re.Match[str]) -> str:
-        return f"{m.group(1)}(<{m.group(2).strip()}>)"
-
-    out: list[str] = []
-    fence: tuple[str, int] | None = None  # (fence char, opening run length)
-    for line in md_text.splitlines(keepends=True):
-        if fence is not None:
-            out.append(line)
-            m = _FENCE_CLOSE_RE.match(line)
-            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= fence[1]:
-                fence = None
-            continue
-        m = _FENCE_OPEN_RE.match(line)
-        if m:
-            fence = (m.group(1)[0], len(m.group(1)))
-            out.append(line)
-            continue
-        out.append(_UNBRACKETED_IMG_WITH_SPACE_RE.sub(repl, line))
-    return "".join(out)
+    verbatim = _verbatim_line_numbers(md_text)
+    chunks: list[str] = []
+    buf: list[str] = []
+    # Split on "\n" rather than splitlines(): markdown-it counts lines the same
+    # way, whereas splitlines() also breaks on \x0b, \x0c and U+2028, which
+    # would knock our indices out of step with the token maps.
+    for i, line in enumerate(md_text.split("\n")):
+        if i in verbatim:
+            if buf:
+                chunks.append(_rewrite_outside_code_spans("\n".join(buf)))
+                buf.clear()
+            chunks.append(line)
+        else:
+            buf.append(line)
+    if buf:
+        chunks.append(_rewrite_outside_code_spans("\n".join(buf)))
+    return "\n".join(chunks)
 
 
 @lru_cache(maxsize=None)
