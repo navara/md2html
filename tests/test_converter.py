@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -431,6 +432,84 @@ def test_inline_images_skips_unknown_extension(tmp_path: Path) -> None:
         inline_images=True,
     )
     assert ";base64," not in html
+
+
+# --- CLI: file discovery, output resolution, atomic writes ---
+
+
+def test_collect_md_files_is_case_insensitive(tmp_path: Path) -> None:
+    """Path.glob('*.md') matches .MD on Windows but not on POSIX."""
+    from md2html.cli import _collect_md_files
+
+    for name in ("a.md", "B.MD", "c.Md", "d.txt"):
+        (tmp_path / name).write_text("# x", encoding="utf-8")
+    found = {p.name for p in _collect_md_files(tmp_path, recursive=False)}
+    assert found == {"a.md", "B.MD", "c.Md"}
+
+
+def test_cli_output_without_extension_is_treated_as_directory(tmp_path: Path) -> None:
+    from md2html.cli import main
+
+    src = tmp_path / "doc.md"
+    src.write_text("# D", encoding="utf-8")
+    outdir = tmp_path / "build"  # does not exist yet
+    assert main([str(src), "-o", str(outdir)]) == 0
+    assert outdir.is_dir()
+    assert (outdir / "doc.html").is_file()
+
+
+def test_cli_output_with_trailing_separator_is_treated_as_directory(
+    tmp_path: Path,
+) -> None:
+    from md2html.cli import main
+
+    src = tmp_path / "doc.md"
+    src.write_text("# D", encoding="utf-8")
+    outdir = tmp_path / "site.v2"  # a suffix, so only the separator marks it
+    assert main([str(src), "-o", str(outdir) + os.sep]) == 0
+    assert (outdir / "doc.html").is_file()
+
+
+def test_cli_output_with_extension_is_a_file(tmp_path: Path) -> None:
+    from md2html.cli import main
+
+    src = tmp_path / "doc.md"
+    src.write_text("# D", encoding="utf-8")
+    out = tmp_path / "nested" / "page.html"
+    assert main([str(src), "-o", str(out)]) == 0
+    assert out.is_file()
+
+
+def test_cli_leaves_no_temp_files_behind(tmp_path: Path) -> None:
+    from md2html.cli import main
+
+    src = tmp_path / "doc.md"
+    src.write_text("# D", encoding="utf-8")
+    out_dir = tmp_path / "out"
+    assert main([str(src), "-o", str(out_dir)]) == 0
+    assert [p.name for p in out_dir.iterdir()] == ["doc.html"]
+
+
+def test_cli_failed_write_leaves_previous_output_intact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The rename is the commit point, so a failure must not truncate the old file."""
+    import md2html.cli as cli
+
+    src = tmp_path / "doc.md"
+    out = tmp_path / "doc.html"
+    src.write_text("# First", encoding="utf-8")
+    assert cli.main([str(src), "-o", str(out)]) == 0
+    before = out.read_text(encoding="utf-8")
+
+    def boom(*args: object, **kwargs: object) -> None:
+        raise OSError("disk full")
+
+    src.write_text("# Second", encoding="utf-8")
+    monkeypatch.setattr(cli.os, "replace", boom)
+    assert cli.main([str(src), "-o", str(out), "--overwrite"]) == 1
+    assert out.read_text(encoding="utf-8") == before
+    assert not [p for p in tmp_path.iterdir() if p.suffix == ".tmp"]
 
 
 def test_inline_images_handles_apostrophes_in_src(tmp_path: Path) -> None:

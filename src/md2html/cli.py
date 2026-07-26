@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
@@ -29,10 +31,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "-o",
         "--output",
-        type=Path,
         help=(
             "Output file (when input is a file) or directory (when input is a "
-            "directory). Defaults to alongside the source with .html extension."
+            "directory). Defaults to alongside the source with .html extension. "
+            "With a file input, a value that names an existing directory, ends "
+            "in a path separator, or carries no file extension is treated as a "
+            "directory to write into."
         ),
     )
     p.add_argument(
@@ -135,15 +139,13 @@ def main(argv: list[str] | None = None) -> int:
     overwrite = args.overwrite or args.watch
 
     if src.is_file():
-        out = args.output if args.output else src.with_suffix(".html")
-        if out.is_dir():
-            out = out / (src.stem + ".html")
+        out = _output_for_file(src, args.output)
         ok = _convert_one(src, out, options, overwrite=overwrite)
         if args.watch:
             _watch_file(src, out, options)
         return 0 if ok else 1
     else:
-        out_dir = args.output if args.output else src
+        out_dir = Path(args.output) if args.output else src
         files = _collect_md_files(src, recursive=args.recursive)
         if not files:
             print(f"No .md files found in {src}", file=sys.stderr)
@@ -158,14 +160,56 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if failed else 0
 
 
+def _output_for_file(src: Path, output: str | None) -> Path:
+    """Resolve where a single-file conversion should be written.
+
+    ``-o`` is read as a directory when it names one, ends in a separator, or
+    has no extension. Without the last two rules, ``-o build/`` for a directory
+    that does not exist yet would quietly produce a file called ``build``.
+    """
+    if output is None:
+        return src.with_suffix(".html")
+    out = Path(output)
+    if out.is_dir() or output.endswith(("/", "\\")) or out.suffix == "":
+        return out / (src.stem + ".html")
+    return out
+
+
 def _collect_md_files(directory: Path, recursive: bool) -> list[Path]:
-    pattern = "**/*.md" if recursive else "*.md"
-    return sorted(p for p in directory.glob(pattern) if p.is_file())
+    # Filter on the suffix rather than globbing "*.md": Path.glob is
+    # case-sensitive on POSIX but not on Windows, so a glob would convert
+    # README.MD on one platform and skip it on the other. _watch_dir already
+    # compares suffixes case-insensitively; this matches it.
+    pattern = "**/*" if recursive else "*"
+    return sorted(
+        p for p in directory.glob(pattern) if p.is_file() and p.suffix.lower() == ".md"
+    )
 
 
 def _target_for(source_file: Path, source_root: Path, output_root: Path) -> Path:
     rel = source_file.relative_to(source_root)
     return (output_root / rel).with_suffix(".html")
+
+
+def _write_atomic(out: Path, text: str) -> None:
+    """Write via a sibling temp file and rename it into place.
+
+    A plain write truncates first, so an interrupted run (or a browser
+    reloading mid-render in watch mode) can observe a half-written document.
+    ``os.replace`` is atomic on both POSIX and Windows.
+    """
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        dir=out.parent, prefix=f".{out.name}.", suffix=".tmp"
+    )
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        os.replace(tmp, out)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def _convert_one(src: Path, out: Path, options: dict, *, overwrite: bool) -> bool:
@@ -178,8 +222,7 @@ def _convert_one(src: Path, out: Path, options: dict, *, overwrite: bool) -> boo
         # utf-8-sig strips a leading BOM, common in files saved on Windows.
         markdown_text = src.read_text(encoding="utf-8-sig")
         html = convert(markdown_text, source_path=src, **options)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(html, encoding="utf-8")
+        _write_atomic(out, html)
     except Exception as exc:  # noqa: BLE001
         print(f"[{ts}] error   {src}: {exc}", file=sys.stderr)
         return False

@@ -53,7 +53,9 @@ md2html doc.md -t github
 md2html doc.md -t polished
 
 # Send output somewhere else
-md2html doc.md -o /tmp/out.html
+md2html doc.md -o /tmp/out.html    # a value with an extension is a file
+md2html doc.md -o /tmp/site        # no extension (or a trailing separator)
+                                   # means a directory: /tmp/site/doc.html
 
 # Convert every .md in a folder, output alongside sources
 md2html ./docs
