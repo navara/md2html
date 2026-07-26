@@ -535,6 +535,79 @@ def test_cli_failed_write_leaves_previous_output_intact(
     assert not [p for p in tmp_path.iterdir() if p.suffix == ".tmp"]
 
 
+# --- watch mode: event coalescing and target resolution ---
+
+
+def test_debouncer_collapses_a_burst_into_one_render() -> None:
+    """One save is several filesystem events; they must yield one render."""
+    from md2html.cli import _Debouncer
+
+    d = _Debouncer(quiet=0.25)
+    doc = Path("a.md")
+    for t in (0.00, 0.05, 0.10, 0.15):
+        d.note(doc, t)
+    assert d.due(0.20) == []  # still inside the quiet window
+    assert d.due(0.40) == [doc]  # one render for the whole burst
+    assert d.due(1.00) == []  # and not repeated afterwards
+
+
+def test_debouncer_releases_each_path_on_its_own_timer() -> None:
+    from md2html.cli import _Debouncer
+
+    d = _Debouncer(quiet=0.25)
+    a, b = Path("a.md"), Path("b.md")
+    d.note(a, 0.0)
+    d.note(b, 0.1)
+    assert d.due(0.30) == [a]
+    assert d.due(0.40) == [b]
+
+
+def test_debouncer_renders_again_after_a_later_edit() -> None:
+    from md2html.cli import _Debouncer
+
+    d = _Debouncer(quiet=0.25)
+    doc = Path("a.md")
+    d.note(doc, 0.0)
+    assert d.due(0.3) == [doc]
+    d.note(doc, 1.0)
+    assert d.due(1.3) == [doc]
+
+
+def test_watch_target_mirrors_into_the_output_tree(tmp_path: Path) -> None:
+    from md2html.cli import _watch_target
+
+    root, out = tmp_path / "docs", tmp_path / "site"
+    assert (
+        _watch_target(root / "sub" / "a.md", root, out, recursive=True)
+        == out / "sub" / "a.html"
+    )
+    assert _watch_target(root / "B.MD", root, out, recursive=False) == out / "B.html"
+
+
+@pytest.mark.parametrize(
+    "relative, recursive",
+    [
+        ("notes.txt", True),  # not markdown
+        (".doc.html.ab12.tmp", True),  # our own atomic-write temp file
+        ("sub/a.md", False),  # subdirectory, but not recursive
+    ],
+)
+def test_watch_target_ignores_irrelevant_changes(
+    tmp_path: Path, relative: str, recursive: bool
+) -> None:
+    from md2html.cli import _watch_target
+
+    root, out = tmp_path / "docs", tmp_path / "site"
+    assert _watch_target(root / relative, root, out, recursive=recursive) is None
+
+
+def test_watch_target_ignores_paths_outside_the_root(tmp_path: Path) -> None:
+    from md2html.cli import _watch_target
+
+    root, out = tmp_path / "docs", tmp_path / "site"
+    assert _watch_target(tmp_path / "elsewhere.md", root, out, recursive=True) is None
+
+
 def test_inline_images_handles_apostrophes_in_src(tmp_path: Path) -> None:
     """Regression: the --inline-images regex used to fail when the src
     attribute contained an apostrophe inside double quotes."""
