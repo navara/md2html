@@ -159,6 +159,7 @@ html = convert(
 ```bash
 uv sync                    # creates .venv, installs editable + locked dev deps
 uv run pytest              # run tests
+uv run ruff check .        # lint
 uv run md2html doc.md      # run the CLI without activating the venv
 uv build                   # build wheel + sdist into dist/
 ```
@@ -170,13 +171,20 @@ transitive dependencies.
 
 ```bash
 py -m venv .venv
-.venv\Scripts\python -m pip install -e . pytest build
+.venv\Scripts\python -m pip install -e . pytest ruff build
 .venv\Scripts\pytest
+.venv\Scripts\ruff check .
 .venv\Scripts\python -m build
 ```
 
 Tests live in `tests/test_converter.py` and exercise every template against
 the `tests/fixtures/kitchen-sink.md` document.
+
+CI runs the lint and the tests on Linux and Windows against Python 3.10 and
+3.13. The two platforms are not redundant: `Path.glob` is case-sensitive on
+one and not the other, which this project has already been bitten by.
+`ruff format` is deliberately not part of the checks, so existing hand-tuned
+layout stays as written.
 
 ## Out of scope
 
