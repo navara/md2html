@@ -37,6 +37,9 @@ TEMPLATES = (
 DEFAULT_TEMPLATE = "github"
 
 _EXTENDS_RE = re.compile(r"^\s*/\*!\s*@extends\s+([\w.\-]+)\s*\*/", re.MULTILINE)
+# How far into a stylesheet the @extends directive may sit. It belongs at the
+# top; the allowance is for a licence or usage comment above it.
+_EXTENDS_SCAN_LINES = 20
 _WIDTH_RE = re.compile(
     r"^\s*\d+(?:\.\d+)?(?:ch|px|em|rem|vw|vh|%|pc|pt|cm|mm|in)?\s*$"
 )
@@ -163,7 +166,11 @@ def _load_resource(name: str) -> str:
 @lru_cache(maxsize=None)
 def _load_template_css(template: str) -> str:
     text = _load_resource(f"{template}.css")
-    m = _EXTENDS_RE.search(text[:200])
+    # Look through the header lines rather than a fixed byte count: a
+    # stylesheet that grows a longer licence or usage comment above its
+    # @extends would otherwise stop inheriting, silently and at a distance.
+    header = "\n".join(text.split("\n", _EXTENDS_SCAN_LINES)[:_EXTENDS_SCAN_LINES])
+    m = _EXTENDS_RE.search(header)
     if m:
         parent = _load_resource(m.group(1))
         text = parent + "\n" + text
@@ -192,9 +199,13 @@ def _heading_slug(title: str) -> str:
 
 
 @lru_cache(maxsize=None)
-def _make_md(
-    with_anchors: bool, with_heading_ids: bool, allow_raw_html: bool
-) -> MarkdownIt:
+def _make_md(heading_ids: bool, permalinks: bool, allow_raw_html: bool) -> MarkdownIt:
+    """Build a parser, cached on the settings that actually shape it.
+
+    Callers pass the resolved configuration rather than the user's flags, so
+    combinations that differ only in a flag the parser cannot see (--toc when
+    anchors are already on) share one instance instead of building two.
+    """
     md = MarkdownIt(
         "gfm-like",
         {
@@ -204,13 +215,13 @@ def _make_md(
             "breaks": False,
         },
     )
-    if with_anchors or with_heading_ids:
+    if heading_ids:
         md.use(
             anchors_plugin,
             min_level=1,
             max_level=6,
             slug_func=_heading_slug,
-            permalink=with_anchors,
+            permalink=permalinks,
             permalinkSymbol="#",
             permalinkBefore=False,
             permalinkSpace=True,
@@ -260,7 +271,7 @@ def convert(
     source_md = _normalize_image_urls(source_md)
 
     # A TOC needs heading ids even when visible anchor links are disabled.
-    md = _make_md(with_anchors, with_toc, allow_raw_html)
+    md = _make_md(with_anchors or with_toc, with_anchors, allow_raw_html)
     env: dict = {}
     tokens = md.parse(source_md, env)
     body_html = md.renderer.render(tokens, md.options, env)

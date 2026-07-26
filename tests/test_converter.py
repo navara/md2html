@@ -535,6 +535,46 @@ def test_cli_failed_write_leaves_previous_output_intact(
     assert not [p for p in tmp_path.iterdir() if p.suffix == ".tmp"]
 
 
+# --- template inheritance and parser caching ---
+
+
+def test_every_extends_directive_is_honoured() -> None:
+    """Guards the header scan: a directive pushed past it fails silently,
+    leaving the palette without the shell it is written against."""
+    from md2html.converter import _EXTENDS_RE, _load_resource, _load_template_css
+
+    extending = 0
+    for template in TEMPLATES:
+        raw = _load_resource(f"{template}.css")
+        m = _EXTENDS_RE.search(raw)  # the whole file, not just the header
+        if m is None:
+            continue
+        extending += 1
+        assert _load_resource(m.group(1)) in _load_template_css(template)
+    assert extending, "expected at least one template to use @extends"
+
+
+def test_parser_cache_is_keyed_on_the_resolved_config() -> None:
+    """--toc adds nothing to a parser that already emits anchors, so the two
+    must share one instance."""
+    from md2html.converter import _make_md
+
+    assert _make_md(True, True, True) is _make_md(True, True, True)
+    # Distinct configurations must not collide.
+    assert _make_md(True, True, True) is not _make_md(True, False, True)
+    assert _make_md(True, True, True) is not _make_md(True, True, False)
+    assert _make_md(True, False, True) is not _make_md(False, False, True)
+
+
+def test_toc_and_anchors_share_a_parser() -> None:
+    from md2html.converter import _make_md
+
+    before = _make_md.cache_info().currsize
+    convert("# T\n\n## S\n", template="github", with_anchors=True)
+    convert("# T\n\n## S\n", template="github", with_anchors=True, with_toc=True)
+    assert _make_md.cache_info().currsize <= before + 1
+
+
 # --- raw HTML passthrough and the self-contained guarantee ---
 
 
