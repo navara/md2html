@@ -27,8 +27,14 @@ def inline_images_in_html(html: str, *, base_dir: Path) -> str:
     """Replace `<img src="local/path.png">` with `<img src="data:...;base64,...">`.
 
     URLs with a scheme (`http:`, `https:`, `data:`, ...) and protocol-relative
-    `//` URLs are left alone. Missing files are also left alone so the
-    rendered file at least shows a broken image rather than blowing up.
+    `//` URLs are left alone. So are files whose extension is not a known image
+    type: without that guard, a document written by someone else could point an
+    `<img>` at `../secrets.env` and have its contents baked into the output as
+    base64. Missing files are left alone too, so the rendered file at least
+    shows a broken image rather than blowing up.
+
+    Relative paths that climb out of ``base_dir`` are still honoured, because
+    a sibling `../assets/logo.png` is an ordinary and legitimate layout.
     """
 
     def replace(m: re.Match[str]) -> str:
@@ -39,13 +45,13 @@ def inline_images_in_html(html: str, *, base_dir: Path) -> str:
         # but the file on disk has the literal characters, so decode first.
         decoded = unquote(src)
         path = (base_dir / decoded).resolve()
+        mime, _ = mimetypes.guess_type(path.name)
+        if mime is None or not mime.startswith("image/"):
+            return m.group(0)
         try:
             data = path.read_bytes()
         except OSError:
             return m.group(0)
-        mime, _ = mimetypes.guess_type(str(path))
-        if mime is None:
-            mime = "application/octet-stream"
         b64 = base64.b64encode(data).decode("ascii")
         return f"{m.group(1)}{m.group(2)}data:{mime};base64,{b64}{m.group(2)}"
 

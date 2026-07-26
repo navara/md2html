@@ -13,7 +13,9 @@ and a watch mode for live preview.
   `solarized-light`, `solarized-dark`, `dracula`, `nord`, `gruvbox-dark`, `midnight`
 - **Syntax highlighting** via Pygments (all 500+ supported languages)
 - **Self-contained output**: all CSS inlined; pass `--inline-images` to embed
-  local images as base64 data URIs too
+  local images as base64 data URIs too (only files with a recognised image
+  extension are embedded, so a stray `<img src="../secrets.env">` cannot
+  smuggle itself into the output)
 - **Configurable column width** — sensible defaults per template, override
   with `--width`
 - **Batch mode**: point it at a directory and every `.md` becomes `.html`;

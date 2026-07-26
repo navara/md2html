@@ -386,6 +386,53 @@ def test_image_with_spaces_and_double_quoted_title() -> None:
     assert 'title="the title"' in html
 
 
+# --- --inline-images must embed images only ---
+
+
+def test_inline_images_skips_non_image_files(tmp_path: Path) -> None:
+    (tmp_path / "secret.txt").write_text("TOP SECRET", encoding="utf-8")
+    doc = tmp_path / "doc.md"
+    doc.write_text("![x](secret.txt)\n", encoding="utf-8")
+    html = convert(
+        doc.read_text(encoding="utf-8"),
+        template="github",
+        source_path=doc,
+        inline_images=True,
+    )
+    assert ";base64," not in html
+    assert "TOP SECRET" not in html
+    assert 'src="secret.txt"' in html
+
+
+def test_inline_images_skips_non_image_reached_by_traversal(tmp_path: Path) -> None:
+    (tmp_path / "secret.env").write_text("API_KEY=hunter2", encoding="utf-8")
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    doc = docs / "doc.md"
+    doc.write_text("![x](../secret.env)\n", encoding="utf-8")
+    html = convert(
+        doc.read_text(encoding="utf-8"),
+        template="github",
+        source_path=doc,
+        inline_images=True,
+    )
+    assert ";base64," not in html
+    assert "hunter2" not in html
+
+
+def test_inline_images_skips_unknown_extension(tmp_path: Path) -> None:
+    (tmp_path / "blob.weird").write_bytes(b"\x00\x01\x02")
+    doc = tmp_path / "doc.md"
+    doc.write_text("![x](blob.weird)\n", encoding="utf-8")
+    html = convert(
+        doc.read_text(encoding="utf-8"),
+        template="github",
+        source_path=doc,
+        inline_images=True,
+    )
+    assert ";base64," not in html
+
+
 def test_inline_images_handles_apostrophes_in_src(tmp_path: Path) -> None:
     """Regression: the --inline-images regex used to fail when the src
     attribute contained an apostrophe inside double quotes."""
