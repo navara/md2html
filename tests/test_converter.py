@@ -864,6 +864,35 @@ def test_watch_target_ignores_paths_outside_the_root(tmp_path: Path) -> None:
     assert _watch_target(tmp_path / "elsewhere.md", root, out, recursive=True) is None
 
 
+def test_convert_reports_the_images_it_inlines(tmp_path: Path) -> None:
+    (tmp_path / "here.png").write_bytes(b"\x89PNG")
+    doc = tmp_path / "docs" / "doc.md"
+    doc.parent.mkdir()
+    md = (
+        "![a](../here.png) ![b](missing.png) ![c](notes.txt) "
+        "![d](https://example.com/x.png)\n"
+    )
+    deps: set[Path] = set()
+    convert(md, source_path=doc, inline_images=True, image_deps=deps)
+    # Missing images count, so their later creation triggers a render;
+    # non-image and remote references do not.
+    assert deps == {
+        (tmp_path / "here.png").resolve(),
+        (doc.parent / "missing.png").resolve(),
+    }
+
+
+def test_jobs_for_an_image_change_are_the_documents_that_use_it(tmp_path: Path) -> None:
+    from md2html.cli import _jobs_for
+
+    img = tmp_path / "a.png"
+    one, two, three = ((tmp_path / f"{n}.md", tmp_path / f"{n}.html") for n in "123")
+    jobs = {one: {img}, two: set(), three: {img}}
+    assert _jobs_for(img, lambda p: None, jobs) == [one, three]
+    # A changed document renders once even if it also lists itself.
+    assert _jobs_for(one[0], lambda p: one, {one: {one[0]}}) == [one]
+
+
 def test_inline_images_handles_apostrophes_in_src(tmp_path: Path) -> None:
     """Regression: the --inline-images regex used to fail when the src
     attribute contained an apostrophe inside double quotes."""

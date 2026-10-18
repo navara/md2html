@@ -280,6 +280,7 @@ def convert(
     title_override: str | None = None,
     allow_raw_html: bool = True,
     lang: str = "en",
+    image_deps: set[Path] | None = None,
 ) -> str:
     """Convert markdown text into a complete, self-contained HTML document.
 
@@ -294,6 +295,9 @@ def convert(
 
     ``lang`` is the BCP 47 tag for ``<html lang>``, which screen readers and
     hyphenation rely on.
+
+    With ``inline_images``, ``image_deps`` (if given) receives the resolved
+    paths of the local images the document references.
     """
     if template not in TEMPLATES:
         raise ValueError(
@@ -315,7 +319,9 @@ def convert(
     toc_html = build_toc_from_tokens(tokens) if with_toc else ""
 
     if inline_images and source_path is not None:
-        body_html = inline_images_in_html(body_html, base_dir=source_path.parent)
+        body_html = inline_images_in_html(
+            body_html, base_dir=source_path.parent, used=image_deps
+        )
 
     template_css = _load_template_css(template)
     if width:
