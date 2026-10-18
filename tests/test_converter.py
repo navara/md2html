@@ -578,6 +578,25 @@ def test_collect_md_files_is_case_insensitive(tmp_path: Path) -> None:
     assert found == {"a.md", "B.MD", "c.Md"}
 
 
+def test_collect_md_files_skips_hidden_and_vendored_directories(tmp_path: Path) -> None:
+    from md2html.cli import _collect_md_files
+
+    root = tmp_path / ".docs"  # a hidden root the user named is still walked
+    for rel in (
+        "a.md",
+        ".notes.md",  # a hidden file is the user's own, not tooling
+        "guide/b.md",
+        ".git/c.md",
+        ".venv/lib/pkg/d.md",
+        "node_modules/pkg/README.md",
+        "guide/.cache/e.md",
+    ):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text("# x", encoding="utf-8")
+    found = {p.relative_to(root).as_posix() for p in _collect_md_files(root, True)}
+    assert found == {"a.md", ".notes.md", "guide/b.md"}
+
+
 def test_cli_output_without_extension_is_treated_as_directory(tmp_path: Path) -> None:
     from md2html.cli import main
 
@@ -780,6 +799,8 @@ def test_watch_target_mirrors_into_the_output_tree(tmp_path: Path) -> None:
         ("notes.txt", True),  # not markdown
         (".doc.html.ab12.tmp", True),  # our own atomic-write temp file
         ("sub/a.md", False),  # subdirectory, but not recursive
+        (".git/a.md", True),  # hidden directory
+        ("node_modules/pkg/README.md", True),
     ],
 )
 def test_watch_target_ignores_irrelevant_changes(
