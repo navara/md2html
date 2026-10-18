@@ -30,7 +30,9 @@ _IMG_SRC_RE = re.compile(
 _NON_LOCAL_RE = re.compile(r"^(?:[a-zA-Z][a-zA-Z0-9+.\-]+:|//)")
 
 
-def inline_images_in_html(html: str, *, base_dir: Path) -> str:
+def inline_images_in_html(
+    html: str, *, base_dir: Path, used: set[Path] | None = None
+) -> str:
     """Replace `<img src="local/path.png">` with `<img src="data:...;base64,...">`.
 
     URLs with a scheme (`http:`, `https:`, `data:`, ...) and protocol-relative
@@ -42,6 +44,10 @@ def inline_images_in_html(html: str, *, base_dir: Path) -> str:
 
     Relative paths that climb out of ``base_dir`` are still honoured, because
     a sibling `../assets/logo.png` is an ordinary and legitimate layout.
+
+    ``used``, if given, receives the resolved path of every local image the
+    document points at, missing ones included, so watch mode can re-render
+    when one of them is edited or appears.
     """
 
     def replace(m: re.Match[str]) -> str:
@@ -55,6 +61,8 @@ def inline_images_in_html(html: str, *, base_dir: Path) -> str:
         mime, _ = mimetypes.guess_type(path.name)
         if mime is None or not mime.startswith("image/"):
             return m.group(0)
+        if used is not None:
+            used.add(path)
         try:
             data = path.read_bytes()
         except OSError:

@@ -121,7 +121,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--watch",
         action="store_true",
-        help="Re-render on file changes (Ctrl-C to stop). Implies --overwrite.",
+        help=(
+            "Re-render on file changes (Ctrl-C to stop). Implies --overwrite. "
+            "With --inline-images, editing an embedded image re-renders the "
+            "documents that use it."
+        ),
     )
     p.add_argument(
         "--overwrite",
@@ -191,9 +195,10 @@ def main(argv: list[str] | None = None) -> int:
         # its own HTML, and in watch mode re-render that write forever.
         if out.exists() and out.samefile(src):
             parser.error(f"output would overwrite the source file: {out}")
-        ok =_convert_one(src, out, options, overwrite=overwrite)
+        images: set[Path] = set()
+        ok = _convert_one(src, out, options, overwrite=overwrite, image_deps=images)
         if args.watch:
-            _watch_file(src, out, options)
+            _watch_file(src, out, options, images)
         return 0 if ok else 1
     else:
         out_dir = Path(args.output) if args.output else src
@@ -205,6 +210,7 @@ def main(argv: list[str] | None = None) -> int:
         # a.md and a.MD can sit side by side on a case-sensitive filesystem,
         # and both map to a.html. Render the first, report the second.
         claimed: dict[Path, Path] = {}
+        jobs: dict[tuple[Path, Path], set[Path]] = {}
         for f in files:
             target = _target_for(f, src, out_dir)
             first = claimed.setdefault(target, f)
@@ -216,10 +222,12 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 failed += 1
                 continue
-            if not _convert_one(f, target, options, overwrite=overwrite):
+            images = jobs[(f, target)] = set()
+            ok = _convert_one(f, target, options, overwrite=overwrite, image_deps=images)
+            if not ok:
                 failed += 1
         if args.watch:
-            _watch_dir(src, out_dir, options, recursive=args.recursive)
+            _watch_dir(src, out_dir, options, args.recursive, jobs)
         return 1 if failed else 0
 
 
@@ -288,8 +296,18 @@ def _write_atomic(out: Path, text: str) -> None:
         raise
 
 
-def _convert_one(src: Path, out: Path, options: dict, *, overwrite: bool) -> bool:
-    """Render one file. Returns False (after printing the error) on failure."""
+def _convert_one(
+    src: Path,
+    out: Path,
+    options: dict,
+    *,
+    overwrite: bool,
+    image_deps: set[Path] | None = None,
+) -> bool:
+    """Render one file. Returns False (after printing the error) on failure.
+
+    ``image_deps`` receives the local images an --inline-images render read.
+    """
     ts = datetime.now().strftime("%H:%M:%S")
     if out.exists() and not overwrite:
         print(f"[{ts}] skipped {out} (already exists; pass --overwrite to replace)")
@@ -297,7 +315,7 @@ def _convert_one(src: Path, out: Path, options: dict, *, overwrite: bool) -> boo
     try:
         # utf-8-sig strips a leading BOM, common in files saved on Windows.
         markdown_text = src.read_text(encoding="utf-8-sig")
-        html = convert(markdown_text, source_path=src, **options)
+        html = convert(markdown_text, source_path=src, image_deps=image_deps, **options)
         _write_atomic(out, html)
     except Exception as exc:  # noqa: BLE001
         print(f"[{ts}] error   {src}: {exc}", file=sys.stderr)
@@ -359,18 +377,40 @@ def _watch_target(
     return (out_root / rel).with_suffix(".html")
 
 
+_Job = tuple[Path, Path]  # (source, output)
+
+
+def _jobs_for(
+    changed: Path,
+    resolve: Callable[[Path], _Job | None],
+    jobs: dict[_Job, set[Path]],
+) -> list[_Job]:
+    """What to re-render for one changed path: the document itself, if it is
+    one, plus every document that embedded it as an image."""
+    todo = []
+    job = resolve(changed)
+    if job is not None:
+        todo.append(job)
+    todo.extend(j for j, images in jobs.items() if changed in images and j not in todo)
+    return todo
+
+
 def _watch(
     root: Path,
     *,
     recursive: bool,
-    resolve: Callable[[Path], tuple[Path, Path] | None],
+    resolve: Callable[[Path], _Job | None],
     options: dict,
     banner: str,
+    jobs: dict[_Job, set[Path]],
 ) -> None:
     """Watch ``root`` and re-render on change until interrupted.
 
     ``resolve`` maps a changed (resolved) path to the (source, output) pair
-    to render, or None to ignore the event.
+    to render, or None to ignore the event. ``jobs`` maps each rendered pair
+    to the images it embedded (empty without --inline-images), so editing an
+    image re-renders the documents that use it. Directories holding those
+    images are watched too, even outside ``root`` (``../assets``).
     """
     from watchdog.events import FileSystemEventHandler
     from watchdog.observers import Observer
@@ -397,17 +437,36 @@ def _watch(
             if not event.is_directory:
                 note(getattr(event, "dest_path", None))
 
+    handler = Handler()
     observer = Observer()
-    observer.schedule(Handler(), str(root), recursive=recursive)
+    observer.schedule(handler, str(root), recursive=recursive)
+    watched = {root}
+
+    def cover(images: set[Path]) -> None:
+        for d in {p.parent for p in images}:
+            if d in watched or (recursive and root in d.parents):
+                continue
+            # A missing image may sit in a directory that does not exist yet;
+            # there is nothing to watch until it does.
+            if d.is_dir():
+                observer.schedule(handler, str(d), recursive=False)
+                watched.add(d)
+
+    for images in jobs.values():
+        cover(images)
     observer.start()
     print(banner)
     try:
         while True:
             time.sleep(_POLL_SECONDS)
             for changed in pending.due(time.monotonic()):
-                job = resolve(changed)
-                if job is not None:
-                    _convert_one(*job, options, overwrite=True)
+                for job in _jobs_for(changed, resolve, jobs):
+                    if not job[0].exists():  # a deleted document
+                        jobs.pop(job, None)
+                        continue
+                    images = jobs[job] = set()
+                    _convert_one(*job, options, overwrite=True, image_deps=images)
+                    cover(images)
     except KeyboardInterrupt:
         pass
     finally:
@@ -415,10 +474,10 @@ def _watch(
         observer.join()
 
 
-def _watch_file(src: Path, out: Path, options: dict) -> None:
+def _watch_file(src: Path, out: Path, options: dict, images: set[Path]) -> None:
     src_resolved = src.resolve()
 
-    def resolve(changed: Path) -> tuple[Path, Path] | None:
+    def resolve(changed: Path) -> _Job | None:
         # Report the path the user typed, not the resolved one.
         return (src, out) if changed == src_resolved else None
 
@@ -428,15 +487,22 @@ def _watch_file(src: Path, out: Path, options: dict) -> None:
         resolve=resolve,
         options=options,
         banner=f"Watching {src}. Ctrl-C to stop.",
+        jobs={(src, out): images},
     )
 
 
-def _watch_dir(src_dir: Path, out_dir: Path, options: dict, recursive: bool) -> None:
+def _watch_dir(
+    src_dir: Path,
+    out_dir: Path,
+    options: dict,
+    recursive: bool,
+    jobs: dict[_Job, set[Path]],
+) -> None:
     # Watchdog reports absolute paths, so compare and slice against the
     # resolved source root (src_dir itself may be relative).
     src_dir_resolved = src_dir.resolve()
 
-    def resolve(changed: Path) -> tuple[Path, Path] | None:
+    def resolve(changed: Path) -> _Job | None:
         target = _watch_target(changed, src_dir_resolved, out_dir, recursive)
         return None if target is None else (changed, target)
 
@@ -446,6 +512,9 @@ def _watch_dir(src_dir: Path, out_dir: Path, options: dict, recursive: bool) -> 
         resolve=resolve,
         options=options,
         banner=f"Watching {src_dir} (recursive={recursive}). Ctrl-C to stop.",
+        # Keyed like resolve()'s results, so a re-render replaces the entry
+        # from the initial pass instead of sitting beside it.
+        jobs={(s.resolve(), o): images for (s, o), images in jobs.items()},
     )
 
 

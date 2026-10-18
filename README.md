@@ -27,7 +27,8 @@ and a watch mode for live preview.
   a file that fails is reported on stderr, the rest still render, and the
   exit code is non-zero. With `-r`, hidden directories (`.git`, `.venv`, ...)
   and `node_modules` are skipped
-- **Watch mode**: re-render on save for live preview
+- **Watch mode**: re-render on save for live preview; with `--inline-images`,
+  editing an embedded image re-renders the documents that use it
 - **Auto TOC**: pass `--toc` to prepend a navigable table of contents
   (headings get ids for the TOC links even with `--no-anchors`). A single
   H1 is treated as the title and left out; a document with several H1s
