@@ -185,6 +185,23 @@ def test_toc_with_skipped_heading_levels_is_valid_html() -> None:
         assert f'href="{slug}"' in toc
 
 
+def test_toc_lists_h1_sections_when_there_are_several() -> None:
+    md = "# Intro\n\n# Usage\n\n## Flags\n\n# API\n"
+    html = convert(md, template="github", with_toc=True)
+    toc = html.split('<nav class="md2html-toc">')[1].split("</nav>")[0]
+    for slug in ("#intro", "#usage", "#flags", "#api"):
+        assert f'href="{slug}"' in toc
+    # Flags nests under Usage rather than sitting beside it.
+    assert '<a href="#usage">Usage</a><ul><li><a href="#flags">' in toc
+
+
+def test_toc_leaves_out_a_lone_h1_title() -> None:
+    html = convert("# Title\n\n## A\n", template="github", with_toc=True)
+    toc = html.split('<nav class="md2html-toc">')[1].split("</nav>")[0]
+    assert 'href="#title"' not in toc
+    assert 'href="#a"' in toc
+
+
 def test_heading_without_sluggable_text_gets_a_usable_id() -> None:
     """An image-only heading slugifies to "", an invalid id whose permalink
     just jumps to the top of the page."""

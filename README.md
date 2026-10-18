@@ -28,7 +28,9 @@ and a watch mode for live preview.
   exit code is non-zero
 - **Watch mode**: re-render on save for live preview
 - **Auto TOC**: pass `--toc` to prepend a navigable table of contents
-  (headings get ids for the TOC links even with `--no-anchors`)
+  (headings get ids for the TOC links even with `--no-anchors`). A single
+  H1 is treated as the title and left out; a document with several H1s
+  gets them listed as its top-level sections
 
 ## Install
 

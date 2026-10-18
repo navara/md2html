@@ -19,15 +19,19 @@ def extract_title_from_tokens(tokens) -> str | None:
 def build_toc_from_tokens(tokens) -> str:
     """Return a `<nav class="md2html-toc">` block of nested heading links.
 
-    Skips H1 (the document title) so the TOC starts at H2. Each item links to
-    the heading's id (added by the anchors plugin).
+    A lone H1 is the document title and is left out, so the TOC starts at H2.
+    A document with several H1s uses them as its top-level sections, and they
+    are listed. Each item links to the heading's id (added by the anchors
+    plugin).
     """
+    h1_count = sum(t.type == "heading_open" and t.tag == "h1" for t in tokens)
+    min_level = 2 if h1_count == 1 else 1
     items: list[tuple[int, str, str]] = []  # (level, slug, text)
     for i, tok in enumerate(tokens):
         if tok.type != "heading_open":
             continue
         level = int(tok.tag[1])
-        if level < 2:
+        if level < min_level:
             continue
         slug = _get_attr(tok, "id") or ""
         text = ""
