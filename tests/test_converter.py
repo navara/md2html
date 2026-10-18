@@ -507,6 +507,7 @@ def test_normalize_width_accepts_lengths(value: str, expected: str) -> None:
         "-10px",
         "80furlongs",
         "80px 90px",
+        "٨٠",  # Arabic-Indic digits: \d matches them, CSS does not
     ],
 )
 def test_normalize_width_rejects_everything_else(value: str) -> None:
