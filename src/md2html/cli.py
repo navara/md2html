@@ -14,7 +14,13 @@ from datetime import datetime
 from pathlib import Path
 
 from . import __version__
-from .converter import DEFAULT_TEMPLATE, TEMPLATES, _normalize_width, convert
+from .converter import (
+    DEFAULT_TEMPLATE,
+    TEMPLATES,
+    _check_lang,
+    _normalize_width,
+    convert,
+)
 
 # How long a file must stay quiet before we re-render it, and how often the
 # watch loop checks. One save is several filesystem events; the wait folds
@@ -101,6 +107,18 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--title",
+        help=(
+            "Document title for <title>. Defaults to the first H1, then the "
+            "file name. With a directory, every file gets this title."
+        ),
+    )
+    p.add_argument(
+        "--lang",
+        default="en",
+        help="Language tag for <html lang>, e.g. cs or pt-BR (default: %(default)s)",
+    )
+    p.add_argument(
         "--watch",
         action="store_true",
         help="Re-render on file changes (Ctrl-C to stop). Implies --overwrite.",
@@ -147,6 +165,10 @@ def main(argv: list[str] | None = None) -> int:
             _normalize_width(args.width)
         except ValueError as exc:
             parser.error(str(exc))
+    try:
+        _check_lang(args.lang)
+    except ValueError as exc:
+        parser.error(str(exc))
 
     options = {
         "template": args.template,
@@ -155,6 +177,8 @@ def main(argv: list[str] | None = None) -> int:
         "inline_images": args.inline_images,
         "width": args.width,
         "allow_raw_html": not args.no_raw_html,
+        "title_override": args.title,
+        "lang": args.lang,
     }
 
     # Watch mode is opt-in for continuous regeneration, so it implies

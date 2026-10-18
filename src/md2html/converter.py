@@ -45,6 +45,9 @@ _EXTENDS_SCAN_LINES = 20
 _WIDTH_RE = re.compile(
     r"^\s*\d+(?:\.\d+)?(?:ch|px|em|rem|vw|vh|%|pc|pt|cm|mm|in)?\s*$", re.ASCII
 )
+# The shape of a BCP 47 tag (primary subtag, then hyphenated subtags);
+# whether the subtags are registered is the browser's business.
+_LANG_RE = re.compile(r"^[A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*$", re.ASCII)
 
 # Match any image whose destination is not already wrapped in <angle brackets>.
 # The paren body is captured whole (destination plus a possible title) and split
@@ -202,6 +205,16 @@ def _normalize_width(value: str) -> str:
     return f"{v}ch" if v.replace(".", "", 1).isdigit() else v
 
 
+def _check_lang(lang: str) -> None:
+    # Validated rather than escaped: it lands inside an attribute, and a
+    # malformed tag is a typo worth reporting.
+    if not _LANG_RE.match(lang):
+        raise ValueError(
+            f"Invalid --lang value {lang!r}. Use a BCP 47 language tag, "
+            "e.g. 'en', 'cs', 'pt-BR'."
+        )
+
+
 def _heading_slug(title: str) -> str:
     """Slugify a heading, falling back so the id is never empty.
 
@@ -266,6 +279,7 @@ def convert(
     width: str | None = None,
     title_override: str | None = None,
     allow_raw_html: bool = True,
+    lang: str = "en",
 ) -> str:
     """Convert markdown text into a complete, self-contained HTML document.
 
@@ -277,11 +291,15 @@ def convert(
     document is free to write ``<script src="https://...">`` and pull in
     whatever it likes; ``allow_raw_html=False`` escapes raw HTML to text
     instead, which makes the self-contained property hold for any input.
+
+    ``lang`` is the BCP 47 tag for ``<html lang>``, which screen readers and
+    hyphenation rely on.
     """
     if template not in TEMPLATES:
         raise ValueError(
             f"Unknown template {template!r}. Choose from: {', '.join(TEMPLATES)}"
         )
+    _check_lang(lang)
 
     source_md = _normalize_image_urls(source_md)
 
@@ -307,6 +325,7 @@ def convert(
     base_html = _load_resource("base.html")
 
     replacements = {
+        "<!--MD2HTML:LANG-->": lang,
         "<!--MD2HTML:TITLE-->": _html_escape_title(title),
         "<!--MD2HTML:TEMPLATE_CSS-->": template_css,
         "<!--MD2HTML:PYGMENTS_CSS-->": pygments_css,
