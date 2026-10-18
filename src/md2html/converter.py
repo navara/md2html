@@ -40,8 +40,10 @@ _EXTENDS_RE = re.compile(r"^\s*/\*!\s*@extends\s+([\w.\-]+)\s*\*/", re.MULTILINE
 # How far into a stylesheet the @extends directive may sit. It belongs at the
 # top; the allowance is for a licence or usage comment above it.
 _EXTENDS_SCAN_LINES = 20
+# ASCII, because \d otherwise accepts digits from every script and CSS
+# only understands 0-9.
 _WIDTH_RE = re.compile(
-    r"^\s*\d+(?:\.\d+)?(?:ch|px|em|rem|vw|vh|%|pc|pt|cm|mm|in)?\s*$"
+    r"^\s*\d+(?:\.\d+)?(?:ch|px|em|rem|vw|vh|%|pc|pt|cm|mm|in)?\s*$", re.ASCII
 )
 
 # Match any image whose destination is not already wrapped in <angle brackets>.
