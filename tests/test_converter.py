@@ -110,6 +110,15 @@ def test_invalid_template_raises() -> None:
         convert("# x", template="does-not-exist")
 
 
+def test_version_matches_the_package_metadata() -> None:
+    """__version__ and pyproject.toml are bumped by hand; catch one lagging."""
+    from importlib.metadata import version
+
+    from md2html import __version__
+
+    assert __version__ == version("md2html")
+
+
 def test_all_twelve_templates_registered() -> None:
     expected = {
         "minimal-light", "minimal-dark", "basic-light", "basic-dark",
