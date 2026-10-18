@@ -432,6 +432,24 @@ def test_image_with_space_in_indented_continuation_is_still_normalized(md: str) 
     assert 'src="images/Foo%20Bar.jpg"' in html
 
 
+def test_image_url_with_spaces_and_parentheses() -> None:
+    """Download-style names such as "Screenshot 2024 (1).png"."""
+    html = convert("![s](shots/Screenshot 2024 (1).png)\n", template="minimal-light")
+    assert 'src="shots/Screenshot%202024%20(1).png"' in html
+
+
+def test_image_with_spaces_and_parenthesised_title() -> None:
+    html = convert("![alt](images/Foo Bar.jpg (the title))\n", template="minimal-light")
+    assert 'src="images/Foo%20Bar.jpg"' in html
+    assert 'title="the title"' in html
+
+
+def test_image_rewrite_stops_at_its_own_closing_paren() -> None:
+    html = convert("![a](my pic.png) and (an aside)\n", template="minimal-light")
+    assert 'src="my%20pic.png"' in html
+    assert "and (an aside)" in html
+
+
 def test_image_with_spaces_and_single_quoted_title() -> None:
     """The title must survive outside the angle brackets, not land in the src."""
     html = convert("![alt](images/Foo Bar.jpg 'the title')\n", template="minimal-light")
