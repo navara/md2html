@@ -160,7 +160,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if src.is_file():
         out = _output_for_file(src, args.output)
-        ok = _convert_one(src, out, options, overwrite=overwrite)
+        # With --overwrite (or --watch) this would replace the Markdown with
+        # its own HTML, and in watch mode re-render that write forever.
+        if out.exists() and out.samefile(src):
+            parser.error(f"output would overwrite the source file: {out}")
+        ok =_convert_one(src, out, options, overwrite=overwrite)
         if args.watch:
             _watch_file(src, out, options)
         return 0 if ok else 1

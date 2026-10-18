@@ -810,3 +810,13 @@ def test_pygments_css_stays_under_highlight() -> None:
         for line in get_pygments_css(template).splitlines():
             if "{" in line and not line.startswith("@media"):
                 assert line.startswith(".highlight"), (template, line)
+
+
+def test_cli_refuses_to_overwrite_the_source(tmp_path: Path) -> None:
+    from md2html.cli import main
+
+    src = tmp_path / "doc.md"
+    src.write_text("# D", encoding="utf-8")
+    with pytest.raises(SystemExit):
+        main([str(src), "-o", str(src), "--overwrite"])
+    assert src.read_text(encoding="utf-8") == "# D"
