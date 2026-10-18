@@ -401,6 +401,20 @@ def test_image_with_space_inside_list_item_is_still_normalized() -> None:
     assert 'src="images/Foo%20Bar.jpg"' in html
 
 
+@pytest.mark.parametrize(
+    "md",
+    [
+        "Text[^1]\n\n[^1]: note\n\n    ![Image](images/Foo Bar.jpg)\n",
+        "Term\n\n:   first\n\n    ![Image](images/Foo Bar.jpg)\n",
+    ],
+    ids=["footnote", "deflist"],
+)
+def test_image_with_space_in_indented_continuation_is_still_normalized(md: str) -> None:
+    """Indented footnote and definition paragraphs are content, not code."""
+    html = convert(md, template="minimal-light")
+    assert 'src="images/Foo%20Bar.jpg"' in html
+
+
 def test_image_with_spaces_and_single_quoted_title() -> None:
     """The title must survive outside the angle brackets, not land in the src."""
     html = convert("![alt](images/Foo Bar.jpg 'the title')\n", template="minimal-light")

@@ -91,8 +91,17 @@ def _rewrite_image(m: re.Match[str]) -> str:
 
 @lru_cache(maxsize=1)
 def _structure_parser() -> MarkdownIt:
-    """Parser used only to locate verbatim blocks; inline work is wasted here."""
-    return MarkdownIt("gfm-like", {"html": True, "linkify": False})
+    """Parser used only to locate verbatim blocks; inline work is wasted here.
+
+    It needs the same block plugins as the real parser: without them, an
+    indented continuation paragraph of a footnote or definition reads as an
+    indented code block, and its images would be skipped.
+    """
+    return (
+        MarkdownIt("gfm-like", {"html": True, "linkify": False})
+        .use(footnote_plugin)
+        .use(deflist_plugin)
+    )
 
 
 def _verbatim_line_numbers(md_text: str) -> set[int]:
