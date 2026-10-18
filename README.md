@@ -25,7 +25,8 @@ and a watch mode for live preview.
   with `--width`
 - **Batch mode**: point it at a directory and every `.md` becomes `.html`;
   a file that fails is reported on stderr, the rest still render, and the
-  exit code is non-zero
+  exit code is non-zero. With `-r`, hidden directories (`.git`, `.venv`, ...)
+  and `node_modules` are skipped
 - **Watch mode**: re-render on save for live preview
 - **Auto TOC**: pass `--toc` to prepend a navigable table of contents
   (headings get ids for the TOC links even with `--no-anchors`). A single

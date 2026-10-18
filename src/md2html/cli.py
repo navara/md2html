@@ -59,7 +59,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "-r",
         "--recursive",
         action="store_true",
-        help="When input is a directory, recurse into subdirectories",
+        help=(
+            "When input is a directory, recurse into subdirectories (except "
+            "hidden ones such as .git and .venv, and node_modules)"
+        ),
     )
     p.add_argument(
         "--toc",
@@ -206,8 +209,21 @@ def _collect_md_files(directory: Path, recursive: bool) -> list[Path]:
     # compares suffixes case-insensitively; this matches it.
     pattern = "**/*" if recursive else "*"
     return sorted(
-        p for p in directory.glob(pattern) if p.is_file() and p.suffix.lower() == ".md"
+        p
+        for p in directory.glob(pattern)
+        if p.is_file()
+        and p.suffix.lower() == ".md"
+        and not _in_skipped_dir(p.relative_to(directory))
     )
+
+
+def _in_skipped_dir(rel: Path) -> bool:
+    """True if a directory in ``rel`` (relative to the root) is one -r skips.
+
+    Hidden directories (.git, .venv, .cache, ...) and node_modules hold
+    tooling and vendored packages, whose READMEs are not the user's docs.
+    """
+    return any(part.startswith(".") or part == "node_modules" for part in rel.parts[:-1])
 
 
 def _target_for(source_file: Path, source_root: Path, output_root: Path) -> Path:
@@ -301,6 +317,8 @@ def _watch_target(
     except ValueError:
         return None
     if not recursive and changed.parent != src_root:
+        return None
+    if _in_skipped_dir(rel):
         return None
     return (out_root / rel).with_suffix(".html")
 
