@@ -782,3 +782,21 @@ def test_inline_images_handles_apostrophes_in_src(tmp_path: Path) -> None:
     )
     assert "data:image/jpeg;base64," in html
     assert "Adventurer's-1-1.jpg" not in html  # original src replaced
+
+
+@pytest.mark.parametrize(
+    "tag",
+    [
+        '<img data-src="lazy.png" src="real.png">',
+        "<img alt=\"see src='lazy.png'\" src=\"real.png\">",
+    ],
+    ids=["data-src", "src-inside-alt"],
+)
+def test_inline_images_embeds_the_real_src_only(tmp_path: Path, tag: str) -> None:
+    from md2html.inline import inline_images_in_html
+
+    (tmp_path / "lazy.png").write_bytes(b"LAZY")
+    (tmp_path / "real.png").write_bytes(b"REAL")
+    out = inline_images_in_html(tag, base_dir=tmp_path)
+    assert "lazy.png" in out
+    assert 'src="data:image/png;base64,UkVBTA=="' in out  # b"REAL"
