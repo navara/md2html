@@ -50,19 +50,23 @@ _WIDTH_RE = re.compile(
 # The paren body is captured whole (destination plus a possible title) and split
 # up in ``_rewrite_image``; sorting the two apart in the regex itself cannot be
 # done reliably, because the space before a title looks exactly like a space
-# inside a destination.
+# inside a destination. One level of balanced parentheses is allowed in the
+# body, for names like ``Screenshot 2024 (1).png``.
 _IMG_DEST_RE = re.compile(
     r"""
     (!\[(?:[^\]\\\n]|\\.)*\])     # 1: ![alt]
     \(\s*                          # opening paren + optional space
-    ((?!<)[^()\n<>]*?)             # 2: destination, plus any title
+    ((?!<)(?:[^()\n<>]|\([^()\n<>]*\))*?)  # 2: destination, plus any title
     \s*\)                          # closing paren (allow trailing whitespace)
     """,
     re.VERBOSE,
 )
 
-# A quoted title at the very end of the paren body, e.g. ``dest "the title"``.
-_TRAILING_TITLE_RE = re.compile(r"""\s+("[^"\n]*"|'[^'\n]*')$""")
+# A title at the very end of the paren body: ``dest "t"``, ``dest 't'`` or
+# ``dest (t)``. A destination that itself ends in a parenthesised part with a
+# space before it, such as ``my file (1)``, reads as a title too; CommonMark
+# has the same ambiguity, and a real file name nearly always has an extension.
+_TRAILING_TITLE_RE = re.compile(r"""\s+("[^"\n]*"|'[^'\n]*'|\([^()\n]*\))$""")
 
 # An inline code span: a run of backticks closed by a run of the same length.
 # Spans may wrap across lines but never across a blank line, since that ends
