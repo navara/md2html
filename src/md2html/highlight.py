@@ -78,15 +78,16 @@ def get_pygments_css(template: str) -> str:
 
 
 def _style_defs(style: str) -> str:
-    """CSS for one Pygments style, every rule under ``.highlight``.
+    """CSS for one Pygments style, every rule under ``main.md2html .highlight``.
 
-    ``get_style_defs`` also emits a bare ``pre { line-height }`` and the
-    line-number rules. Every template sets its own ``pre`` line-height and we
-    never render line numbers, so those rules only reach pages the output is
-    embedded in.
+    Scoped like the templates, so a page the output is embedded in keeps its
+    own ``.highlight`` styles. ``get_style_defs`` also emits a bare
+    ``pre { line-height }`` and the line-number rules; every template sets its
+    own ``pre`` line-height and we never render line numbers, so those are
+    left out.
     """
     fmt = HtmlFormatter(style=style)
+    scope = "main.md2html .highlight"
     return "\n".join(
-        fmt.get_background_style_defs(".highlight")
-        + fmt.get_token_style_defs(".highlight")
+        fmt.get_background_style_defs(scope) + fmt.get_token_style_defs(scope)
     )

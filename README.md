@@ -123,8 +123,10 @@ palette via CSS variables — adding a new theme is one file with ~10 lines.
 Templates with unique typography (`minimal-*`, `github`, `polished`) stand on
 their own.
 
-All styles are scoped under `main.md2html` so embedding the rendered HTML into
-another page won't leak styles.
+All content styles, syntax highlighting included, are scoped under
+`main.md2html`, so embedding the rendered HTML into another page won't leak
+them. The only page-level rules are the template's `html` background and a
+`body { margin: 0 }`.
 
 ### Column width
 
