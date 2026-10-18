@@ -178,8 +178,20 @@ def main(argv: list[str] | None = None) -> int:
             print(f"No .md files found in {src}", file=sys.stderr)
             return 1
         failed = 0
+        # a.md and a.MD can sit side by side on a case-sensitive filesystem,
+        # and both map to a.html. Render the first, report the second.
+        claimed: dict[Path, Path] = {}
         for f in files:
             target = _target_for(f, src, out_dir)
+            first = claimed.setdefault(target, f)
+            if first != f:
+                ts = datetime.now().strftime("%H:%M:%S")
+                print(
+                    f"[{ts}] error   {f}: same output as {first} ({target})",
+                    file=sys.stderr,
+                )
+                failed += 1
+                continue
             if not _convert_one(f, target, options, overwrite=overwrite):
                 failed += 1
         if args.watch:

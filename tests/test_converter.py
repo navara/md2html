@@ -578,6 +578,19 @@ def test_collect_md_files_is_case_insensitive(tmp_path: Path) -> None:
     assert found == {"a.md", "B.MD", "c.Md"}
 
 
+def test_cli_reports_sources_that_share_an_output(tmp_path: Path, capsys) -> None:
+    from md2html.cli import main
+
+    (tmp_path / "a.md").write_text("# lower", encoding="utf-8")
+    if (tmp_path / "A.MD").exists():
+        pytest.skip("case-insensitive filesystem: a.md and a.MD cannot coexist")
+    (tmp_path / "a.MD").write_text("# upper", encoding="utf-8")
+    assert main([str(tmp_path)]) == 1
+    # Sorted order puts a.MD first; it wins and a.md is reported.
+    assert "upper" in (tmp_path / "a.html").read_text(encoding="utf-8")
+    assert "same output as" in capsys.readouterr().err
+
+
 def test_collect_md_files_skips_hidden_and_vendored_directories(tmp_path: Path) -> None:
     from md2html.cli import _collect_md_files
 
