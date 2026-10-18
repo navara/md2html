@@ -8,12 +8,11 @@ version = "0.1.0"
 description = "Convert Markdown to self-contained HTML with themes and syntax highlighting"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "md2html" }]
 keywords = ["markdown", "html", "converter", "cli", "static-site"]
 classifiers = [
     "Environment :: Console",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
@@ -22,7 +21,7 @@ classifiers = [
 ]
 dependencies = [
     "markdown-it-py[linkify]>=4.2.0",
-    "mdit-py-plugins>=0.4.0",
+    "mdit-py-plugins>=0.5.0",
     "Pygments>=2.17.0",
     "watchdog>=4.0.0",
 ]
