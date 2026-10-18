@@ -591,6 +591,38 @@ def test_cli_reports_sources_that_share_an_output(tmp_path: Path, capsys) -> Non
     assert "same output as" in capsys.readouterr().err
 
 
+def test_lang_defaults_to_en_and_can_be_set() -> None:
+    assert '<html lang="en">' in convert("x\n")
+    assert '<html lang="pt-BR">' in convert("x\n", lang="pt-BR")
+
+
+@pytest.mark.parametrize("lang", ["", "en GB", 'en"><script>', "toolongsubtag"])
+def test_lang_rejects_malformed_tags(lang: str) -> None:
+    with pytest.raises(ValueError):
+        convert("x\n", lang=lang)
+
+
+def test_cli_title_and_lang(tmp_path: Path) -> None:
+    from md2html.cli import main
+
+    src = tmp_path / "doc.md"
+    src.write_text("# From H1\n", encoding="utf-8")
+    assert main([str(src), "--title", "Q&A <notes>", "--lang", "cs"]) == 0
+    html = (tmp_path / "doc.html").read_text(encoding="utf-8")
+    assert "<title>Q&amp;A &lt;notes&gt;</title>" in html
+    assert '<html lang="cs">' in html
+
+
+def test_cli_rejects_a_malformed_lang(tmp_path: Path) -> None:
+    from md2html.cli import main
+
+    src = tmp_path / "doc.md"
+    src.write_text("# D", encoding="utf-8")
+    with pytest.raises(SystemExit):
+        main([str(src), "--lang", "en GB"])
+    assert not (tmp_path / "doc.html").exists()
+
+
 def test_collect_md_files_skips_hidden_and_vendored_directories(tmp_path: Path) -> None:
     from md2html.cli import _collect_md_files
 

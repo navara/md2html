@@ -84,6 +84,9 @@ md2html doc.md --inline-images
 # Escape raw HTML rather than passing it through
 md2html doc.md --no-raw-html
 
+# Set the <title> (default: first H1, then the file name) and <html lang>
+md2html doc.md --title "Release notes" --lang cs
+
 # Override column width (plain number = ch; unit accepted otherwise)
 md2html doc.md --width 90          # 90ch
 md2html doc.md --width 1200px      # explicit px
