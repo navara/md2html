@@ -71,7 +71,22 @@ def get_pygments_css(template: str) -> str:
     style = _TEMPLATE_PYGMENTS.get(template, "default")
     if isinstance(style, tuple):
         light_style, dark_style = style
-        light_css = HtmlFormatter(style=light_style).get_style_defs(".highlight")
-        dark_css = HtmlFormatter(style=dark_style).get_style_defs(".highlight")
+        light_css = _style_defs(light_style)
+        dark_css = _style_defs(dark_style)
         return f"{light_css}\n@media (prefers-color-scheme: dark) {{\n{dark_css}\n}}"
-    return HtmlFormatter(style=style).get_style_defs(".highlight")
+    return _style_defs(style)
+
+
+def _style_defs(style: str) -> str:
+    """CSS for one Pygments style, every rule under ``.highlight``.
+
+    ``get_style_defs`` also emits a bare ``pre { line-height }`` and the
+    line-number rules. Every template sets its own ``pre`` line-height and we
+    never render line numbers, so those rules only reach pages the output is
+    embedded in.
+    """
+    fmt = HtmlFormatter(style=style)
+    return "\n".join(
+        fmt.get_background_style_defs(".highlight")
+        + fmt.get_token_style_defs(".highlight")
+    )
