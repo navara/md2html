@@ -9,11 +9,18 @@ from pathlib import Path
 from urllib.parse import unquote
 
 # Match the src attribute of <img> tags. Captures: (prefix, quote, value).
+# The prefix steps over whole attributes, so neither ``data-src=`` nor a
+# ``src=`` inside another attribute's quoted value is taken for the real one.
 # The value uses ``.*?`` with the captured quote as the terminator so it
 # correctly handles apostrophes inside double-quoted src (and vice versa).
 _IMG_SRC_RE = re.compile(
-    r'(<img\b[^>]*?\bsrc=)(["\'])(.*?)\2',
-    re.IGNORECASE | re.DOTALL,
+    r"""
+    (<img\b
+      (?:\s+[^\s"'>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*?
+      \s+src\s*=\s*)
+    (["'])(.*?)\2
+    """,
+    re.IGNORECASE | re.DOTALL | re.VERBOSE,
 )
 
 # Anything with a URL scheme (http:, https:, data:, file:, mailto:, ...) or a
