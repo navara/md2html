@@ -838,14 +838,14 @@ def test_inline_images_embeds_the_real_src_only(tmp_path: Path, tag: str) -> Non
     assert 'src="data:image/png;base64,UkVBTA=="' in out  # b"REAL"
 
 
-def test_pygments_css_stays_under_highlight() -> None:
+def test_pygments_css_is_scoped_like_the_templates() -> None:
     """Unscoped rules would leak into a page the output is embedded in."""
     from md2html.highlight import get_pygments_css
 
     for template in TEMPLATES:
         for line in get_pygments_css(template).splitlines():
             if "{" in line and not line.startswith("@media"):
-                assert line.startswith(".highlight"), (template, line)
+                assert line.startswith("main.md2html .highlight"), (template, line)
 
 
 def test_cli_refuses_to_overwrite_the_source(tmp_path: Path) -> None:
