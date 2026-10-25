@@ -35,8 +35,8 @@ Homepage = "https://github.com/navara/md2html"
 [dependency-groups]
 dev = [
     "pytest>=8.0",
-    "build>=1.6.0",
-    "ruff>=0.16.5",
+    "build>=1.6.1",
+    "ruff>=0.17.1",
 ]
 
 [tool.setuptools.packages.find]
