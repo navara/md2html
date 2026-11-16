@@ -73,10 +73,17 @@ jobs:
         run: uv sync --locked --no-dev --group release --no-editable --python 3.13
 
       # --collect-data bundles the templates, which are read as package data at runtime; without it every conversion fails.
+      # The excluded modules are reachable only through imports md2html never runs (it does no networking), yet would pull in OpenSSL; leaving them out
+      # cuts the Windows executable from 10.8 MB to 8.0 MB. If a dependency starts to need one, the smoke test or a user hits ModuleNotFoundError.
       - name: Build standalone executable
         run: >-
           uv run --no-sync pyinstaller --onefile --noconfirm --name md2html
-          --collect-data md2html packaging/launcher.py
+          --collect-data md2html
+          --exclude-module ssl --exclude-module _ssl
+          --exclude-module hashlib --exclude-module _hashlib
+          --exclude-module http --exclude-module email
+          --exclude-module decimal --exclude-module _decimal --exclude-module _pydecimal
+          packaging/launcher.py
 
       - name: Smoke-test the executable
         run: uv run --no-sync python packaging/smoke_test.py "$EXE" "$VERSION"
