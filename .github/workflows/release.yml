@@ -1,0 +1,137 @@
+name: Release
+
+# Cut a release by pushing a tag that matches the version in pyproject.toml:
+#   git tag v0.3.0 && git push origin v0.3.0
+# The tag is checked, the full CI matrix runs, standalone executables are built and smoke-tested on each platform, and only if every step passes is the GitHub
+# release published, with the executables, the wheel, the sdist and SHA256SUMS attached.
+# Running it by hand (workflow_dispatch) is a dry run: everything up to the release job, which is skipped, so the builds can be proven without a tag.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Tag matches the project version
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+          IS_TAG: ${{ github.ref_type == 'tag' }}
+        run: |
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          if [ "$IS_TAG" = "true" ] && [ "v$version" != "$TAG" ]; then
+            echo "::error::Tag $TAG does not match version $version in pyproject.toml; bump the version or fix the tag."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: check-tag
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: [check-tag, test]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows-x64
+            exe: dist/md2html.exe
+          # The oldest runner on offer, so the executable does not demand a newer glibc than it needs. Move it up when GitHub retires this image.
+          - os: ubuntu-22.04
+            target: linux-x64
+            exe: dist/md2html
+          - os: macos-latest
+            target: macos-arm64
+            exe: dist/md2html
+    env:
+      VERSION: ${{ needs.check-tag.outputs.version }}
+      EXE: ${{ matrix.exe }}
+      ARCHIVE: md2html-${{ needs.check-tag.outputs.version }}-${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Pinned to a full version on purpose: setup-uv stopped publishing floating major tags after v7, so @v8, @v9 and @v10 do not resolve.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.3
+
+      - name: Install project and locked PyInstaller
+        run: uv sync --locked --no-dev --group release --no-editable --python 3.13
+
+      # --collect-data bundles the templates, which are read as package data at runtime; without it every conversion fails.
+      - name: Build standalone executable
+        run: >-
+          uv run --no-sync pyinstaller --onefile --noconfirm --name md2html
+          --collect-data md2html packaging/launcher.py
+
+      - name: Smoke-test the executable
+        run: uv run --no-sync python packaging/smoke_test.py "$EXE" "$VERSION"
+        shell: bash
+
+      # Archives keep the plain md2html name and, on Linux and macOS, the exec bit.
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory out | Out-Null
+          Compress-Archive -Path dist/md2html.exe, README.md -DestinationPath "out/$env:ARCHIVE.zip"
+
+      - name: Package (Linux, macOS)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir out
+          tar -czf "out/$ARCHIVE.tar.gz" -C dist md2html -C .. README.md
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bin-${{ matrix.target }}
+          path: out/*
+          if-no-files-found: error
+
+  release:
+    needs: [check-tag, build]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.3
+
+      - name: Build wheel and sdist
+        run: uv build --out-dir out
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: bin-*
+          path: out
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: out
+        run: sha256sum * > SHA256SUMS && cat SHA256SUMS
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.check-tag.outputs.version }}
+        run: >-
+          gh release create "$TAG" out/*
+          --verify-tag --title "md2html $VERSION" --generate-notes

@@ -4,17 +4,17 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The release workflow runs this whole matrix before it builds anything.
+  workflow_call:
 
-# Checking out and running tests needs nothing else. Without this the job
-# inherits the repository default, which can be read/write on every scope.
+# Checking out and running tests needs nothing else. Without this the job inherits the repository default, which can be read/write on every scope.
 permissions:
   contents: read
 
 jobs:
   test:
-    # Both platforms on purpose: file discovery and path handling differ
-    # between them, and a .MD file matching on one but not the other is
-    # exactly the kind of bug that only a matrix catches.
+    # Both platforms on purpose: file discovery and path handling differ between them, and a .MD file matching on one but not the other is exactly the kind of
+    # bug that only a matrix catches.
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -25,8 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Pinned to a full version on purpose: setup-uv stopped publishing
-      # floating major tags after v7, so @v8, @v9 and @v10 do not resolve.
+      # Pinned to a full version on purpose: setup-uv stopped publishing floating major tags after v7, so @v8, @v9 and @v10 do not resolve.
       - name: Install uv
         uses: astral-sh/setup-uv@v10.3.3
         with:

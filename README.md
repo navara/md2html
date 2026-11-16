@@ -1,40 +1,41 @@
 # md2html
 
-Convert Markdown files to **self-contained HTML** — no external CSS, no external JS,
-optionally no external images. Twelve built-in themes, Pygments syntax highlighting,
-and a watch mode for live preview.
+Convert Markdown files to **self-contained HTML** — no external CSS, no external JS, optionally no external images. Twelve built-in themes, Pygments syntax
+highlighting, and a watch mode for live preview.
 
 ## Features
 
 - **CommonMark + GFM** — tables, task lists, strikethrough, autolinks
 - **Plus**: footnotes, definition lists, heading anchors with slug ids
-- **Twelve themes**: `minimal-light`, `minimal-dark`, `basic-light`, `basic-dark`,
-  `github` (auto light/dark via `prefers-color-scheme`), `polished`,
+- **Twelve themes**: `minimal-light`, `minimal-dark`, `basic-light`, `basic-dark`, `github` (auto light/dark via `prefers-color-scheme`), `polished`,
   `solarized-light`, `solarized-dark`, `dracula`, `nord`, `gruvbox-dark`, `midnight`
 - **Syntax highlighting** via Pygments (all 500+ supported languages)
-- **Self-contained output**: all CSS inlined; pass `--inline-images` to embed
-  local images as base64 data URIs too (only files with a recognised image
-  extension are embedded, so a stray `<img src="../secrets.env">` cannot
-  smuggle itself into the output)
-- **Raw HTML** in the source is passed through verbatim, as CommonMark
-  specifies. Nothing md2html emits reaches the network, but a document that
-  writes its own `<script src="https://...">` still can, so `--no-raw-html`
-  escapes raw HTML to text when the self-contained property has to hold for
-  input you did not write
-- **Configurable column width** — sensible defaults per template, override
-  with `--width`
-- **Batch mode**: point it at a directory and every `.md` becomes `.html`;
-  a file that fails is reported on stderr, the rest still render, and the
-  exit code is non-zero. With `-r`, hidden directories (`.git`, `.venv`, ...)
-  and `node_modules` are skipped
-- **Watch mode**: re-render on save for live preview; with `--inline-images`,
-  editing an embedded image re-renders the documents that use it
-- **Auto TOC**: pass `--toc` to prepend a navigable table of contents
-  (headings get ids for the TOC links even with `--no-anchors`). A single
-  H1 is treated as the title and left out; a document with several H1s
-  gets them listed as its top-level sections
+- **Self-contained output**: all CSS inlined; pass `--inline-images` to embed local images as base64 data URIs too (only files with a recognised image
+  extension are embedded, so a stray `<img src="../secrets.env">` cannot smuggle itself into the output)
+- **Raw HTML** in the source is passed through verbatim, as CommonMark specifies. Nothing md2html emits reaches the network, but a document that writes its
+  own `<script src="https://...">` still can, so `--no-raw-html` escapes raw HTML to text when the self-contained property has to hold for input you did not
+  write
+- **Configurable column width** — sensible defaults per template, override with `--width`
+- **Batch mode**: point it at a directory and every `.md` becomes `.html`; a file that fails is reported on stderr, the rest still render, and the exit code is
+  non-zero. With `-r`, hidden directories (`.git`, `.venv`, ...) and `node_modules` are skipped
+- **Watch mode**: re-render on save for live preview; with `--inline-images`, editing an embedded image re-renders the documents that use it
+- **Auto TOC**: pass `--toc` to prepend a navigable table of contents (headings get ids for the TOC links even with `--no-anchors`). A single H1 is treated as
+  the title and left out; a document with several H1s gets them listed as its top-level sections
 
 ## Install
+
+### Download a ready-made executable
+
+Each [release](https://github.com/navara/md2html/releases) has a standalone `md2html` for Windows (x64), Linux (x64) and macOS (Apple silicon). It needs no
+Python: unpack the archive and put `md2html` (`md2html.exe` on Windows) somewhere on your `PATH`. `SHA256SUMS` in the release lists the checksum of every file.
+
+The executables are not code-signed. Windows SmartScreen may warn on first run ("More info", then "Run anyway"). On macOS, clear the download quarantine once:
+
+```bash
+xattr -d com.apple.quarantine md2html
+```
+
+### With Python
 
 From a checkout:
 
@@ -48,8 +49,7 @@ Or with `pipx` to get an isolated CLI:
 pipx install .
 ```
 
-Requires Python 3.10+. Dependencies: `markdown-it-py[linkify]`, `mdit-py-plugins`,
-`Pygments`, `watchdog`.
+Requires Python 3.10+. Dependencies: `markdown-it-py[linkify]`, `mdit-py-plugins`, `Pygments`, `watchdog`. Each release also carries the wheel and sdist.
 
 ## Usage
 
@@ -123,20 +123,15 @@ python -m md2html doc.md -t github
 | `gruvbox-dark`    | Warm yellow + brown on dark, retro Gruvbox look            | `gruvbox-dark`    |
 | `midnight`        | Deep navy with cyan/magenta neon glow on headings and code | `fruity`          |
 
-Most templates share a common stylesheet (`_basic.css`) and customize only the
-palette via CSS variables — adding a new theme is one file with ~10 lines.
-Templates with unique typography (`minimal-*`, `github`, `polished`) stand on
-their own.
+Most templates share a common stylesheet (`_basic.css`) and customize only the palette via CSS variables — adding a new theme is one file with ~10 lines.
+Templates with unique typography (`minimal-*`, `github`, `polished`) stand on their own.
 
-All content styles, syntax highlighting included, are scoped under
-`main.md2html`, so embedding the rendered HTML into another page won't leak
-them. The only page-level rules are the template's `html` background and a
-`body { margin: 0 }`.
+All content styles, syntax highlighting included, are scoped under `main.md2html`, so embedding the rendered HTML into another page won't leak them. The only
+page-level rules are the template's `html` background and a `body { margin: 0 }`.
 
 ### Column width
 
-All templates default to a `1470px` reading column (matching `github`) for
-visual consistency across themes. Pass `--width` to override:
+All templates default to a `1470px` reading column (matching `github`) for visual consistency across themes. Pass `--width` to override:
 
 ```bash
 md2html doc.md --width 80          # 80ch
@@ -144,8 +139,7 @@ md2html doc.md --width 1280px      # exact pixel width
 md2html doc.md --width 60rem       # any CSS length unit works
 ```
 
-Plain numbers are interpreted as `ch` (character widths). Anything else is
-passed through after a sanity check.
+Plain numbers are interpreted as `ch` (character widths). Anything else is passed through after a sanity check.
 
 ## Programmatic use
 
@@ -173,8 +167,7 @@ uv run md2html doc.md      # run the CLI without activating the venv
 uv build                   # build wheel + sdist into dist/
 ```
 
-`uv.lock` is committed so every contributor and CI run gets bit-identical
-transitive dependencies.
+`uv.lock` is committed so every contributor and CI run gets bit-identical transitive dependencies.
 
 ### With stock pip / venv
 
@@ -186,20 +179,36 @@ py -m venv .venv
 .venv\Scripts\python -m build
 ```
 
-Tests live in `tests/test_converter.py` and exercise every template against
-the `tests/fixtures/kitchen-sink.md` document.
+Tests live in `tests/test_converter.py` and exercise every template against the `tests/fixtures/kitchen-sink.md` document.
 
-CI runs the lint and the tests on Linux and Windows against Python 3.10 and
-3.13. The two platforms are not redundant: `Path.glob` is case-sensitive on
-one and not the other, which this project has already been bitten by.
-`ruff format` is deliberately not part of the checks, so existing hand-tuned
-layout stays as written.
+CI runs the lint and the tests on Linux and Windows against Python 3.10 and 3.13. The two platforms are not redundant: `Path.glob` is case-sensitive on one and
+not the other, which this project has already been bitten by. `ruff format` is deliberately not part of the checks, so existing hand-tuned layout stays as
+written.
+
+### Releasing
+
+A release is cut by pushing a version tag; merging to `main` publishes nothing.
+
+1. Bump the version in `pyproject.toml` and `src/md2html/__init__.py` (a test checks they agree), run `uv lock`, and commit.
+2. Tag that commit and push the tag:
+
+   ```bash
+   git tag v0.3.0
+   git push origin v0.3.0
+   ```
+
+The [release workflow](.github/workflows/release.yml) refuses a tag that does not match the `pyproject.toml` version and runs the full CI matrix. It then builds
+the executables with PyInstaller (`packaging/launcher.py`) on Windows, Linux and macOS, and runs `packaging/smoke_test.py` against each one: it renders a page
+and checks that templates, highlighting and linkify survived freezing. Only when all of that passes does it publish the GitHub release, with the archives, the
+wheel, the sdist, `SHA256SUMS` and release notes generated from the merged pull requests. A failed run publishes nothing, so after a fix delete the tag, re-tag
+and push again.
+
+To prove the builds without releasing, run the workflow by hand from `main` (`gh workflow run release.yml`): it does everything except publish.
 
 ## Out of scope
 
 - Custom CSS injection — fork or extend the template files instead
-- Mermaid / KaTeX rendering — they would require JS, breaking the
-  self-contained guarantee
+- Mermaid / KaTeX rendering — they would require JS, breaking the self-contained guarantee
 - PDF output
 
 ## License

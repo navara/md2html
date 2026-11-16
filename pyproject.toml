@@ -40,6 +40,10 @@ dev = [
     "build>=1.6.1",
     "ruff>=0.17.5",
 ]
+# Only the release workflow installs this, to freeze the CLI into one executable.
+release = [
+    "pyinstaller>=6.22.3",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
