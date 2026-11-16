@@ -430,6 +430,9 @@ def _watch(
                 note(event.src_path)
 
         on_created = on_modified
+        # watchdog 7 reports metadata-only changes here instead of on_modified
+        # (touch and chmod on Linux, chmod on Windows); 6 never calls it.
+        on_attrib = on_modified
 
         def on_moved(self, event):  # type: ignore[override]
             # Editors that save atomically write a temp file and rename it
@@ -438,7 +441,9 @@ def _watch(
                 note(getattr(event, "dest_path", None))
 
     handler = Handler()
-    observer = Observer()
+    # watchdog 7 on Windows holds events until its queue has been quiet for
+    # this long (default 1 s), which would add a second to every re-render.
+    observer = Observer(timeout=_POLL_SECONDS)
     observer.schedule(handler, str(root), recursive=recursive)
     watched = {root}
 

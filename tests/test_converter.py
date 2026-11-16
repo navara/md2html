@@ -234,6 +234,22 @@ def test_ordinary_heading_ids_are_unchanged_by_the_fallback() -> None:
     assert "section" not in html
 
 
+def test_heading_ids_keep_the_space_beside_an_image() -> None:
+    """Slugs keep the space next to an image, so the id ends or starts with "-".
+    This is mdit-py-plugins >= 0.7.0, matching MyST-Parser's github_slugify."""
+    html = convert("# Foo ![img](x.png)\n\n## ![img](x.png) Bar\n", template="github")
+    assert 'id="foo-"' in html
+    assert 'id="-bar"' in html
+
+
+def test_heading_of_several_images_falls_back_instead_of_a_bare_dash() -> None:
+    md = "# T\n\n## ![a](x.png) ![b](y.png)\n\n## ![a](x.png) !\n"
+    html = convert(md, template="github")
+    assert 'id="-"' not in html
+    assert 'id="section"' in html
+    assert 'id="section-1"' in html
+
+
 def test_midnight_has_neon_glow() -> None:
     html = convert("# Hello\n\n```py\nprint('hi')\n```", template="midnight")
     # The midnight palette adds neon glow rules on top of _basic.css.

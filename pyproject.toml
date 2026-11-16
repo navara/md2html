@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=83.0.0", "wheel"]
+requires = ["setuptools>=84.2.1", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -20,10 +20,12 @@ classifiers = [
     "Topic :: Text Processing :: Markup :: HTML",
 ]
 dependencies = [
-    "markdown-it-py[linkify]>=4.2.0",
-    "mdit-py-plugins>=0.5.0",
-    "Pygments>=2.17.0",
-    "watchdog>=4.0.0",
+    "markdown-it-py[linkify]>=4.3.0",
+    "mdit-py-plugins>=0.7.0",
+    "Pygments>=2.21.0",
+    # watchdog 7 dropped Python 3.10; take the newest each interpreter can run.
+    "watchdog>=6.0.0; python_version < '3.11'",
+    "watchdog>=7.1.0; python_version >= '3.11'",
 ]
 
 [project.scripts]
@@ -34,9 +36,9 @@ Homepage = "https://github.com/navara/md2html"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0",
-    "build>=1.6.0",
-    "ruff>=0.16.5",
+    "pytest>=9.2.0",
+    "build>=1.6.1",
+    "ruff>=0.17.5",
 ]
 
 [tool.setuptools.packages.find]

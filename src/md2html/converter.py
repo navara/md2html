@@ -218,12 +218,14 @@ def _check_lang(lang: str) -> None:
 def _heading_slug(title: str) -> str:
     """Slugify a heading, falling back so the id is never empty.
 
-    A heading made only of an image (or of punctuation) slugifies to "",
-    which is not a valid id and leaves the permalink pointing at the top of
-    the page. The plugin uniquifies whatever we hand back, per document, so
-    a constant fallback still yields section, section-1, section-2.
+    A heading made only of images (or of punctuation) slugifies to "", or to
+    "-" when the spaces between them survive. Neither names anything, and ""
+    leaves the permalink pointing at the top of the page. The plugin
+    uniquifies whatever we hand back, per document, so a constant fallback
+    still yields section, section-1, section-2.
     """
-    return _default_slugify(title) or "section"
+    slug = _default_slugify(title)
+    return slug if slug.strip("-") else "section"
 
 
 @cache
