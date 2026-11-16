@@ -213,4 +213,4 @@ To prove the builds without releasing, run the workflow by hand from `main` (`gh
 
 ## License
 
-MIT
+MIT, see [LICENSE](LICENSE).

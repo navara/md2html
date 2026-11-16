@@ -88,13 +88,13 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory out | Out-Null
-          Compress-Archive -Path dist/md2html.exe, README.md -DestinationPath "out/$env:ARCHIVE.zip"
+          Compress-Archive -Path dist/md2html.exe, README.md, LICENSE -DestinationPath "out/$env:ARCHIVE.zip"
 
       - name: Package (Linux, macOS)
         if: runner.os != 'Windows'
         run: |
           mkdir out
-          tar -czf "out/$ARCHIVE.tar.gz" -C dist md2html -C .. README.md
+          tar -czf "out/$ARCHIVE.tar.gz" -C dist md2html -C .. README.md LICENSE
 
       - uses: actions/upload-artifact@v7
         with:
